@@ -1,0 +1,286 @@
+{
+  "version": "1.0",
+  "last_updated": "2025-01-20",
+  "description": "Science-backed strength training knowledge base for AI fitness coach",
+  
+  "recovery": {
+    "muscle_group_recovery": {
+      "minimum_hours": 48,
+      "optimal_hours": 48,
+      "maximum_hours": 72,
+      "description": "Muscle groups need 48-72 hours of recovery between training sessions for optimal adaptation",
+      "confidence": "medium",
+      "flexibility": "high",
+      "reasoning": "Individual recovery capacity varies hugely based on genetics, experience, volume, nutrition, sleep, and stress. This is a guideline, not a law.",
+      "emphasis": "user_data",
+      "sources": [
+        "Schoenfeld et al. (2016). Effects of Resistance Training Frequency on Measures of Muscle Hypertrophy",
+        "Grgic et al. (2018). The effects of resistance training frequency on muscle hypertrophy"
+      ],
+      "notes": "Smaller muscle groups (biceps, triceps) may recover faster. Larger muscle groups (legs, back) may need closer to 72 hours. Individual variation is huge - adjust based on your response."
+    },
+    "full_body_recovery": {
+      "minimum_hours": 24,
+      "optimal_hours": 48,
+      "description": "Full body workouts should have at least 24-48 hours between sessions",
+      "sources": [
+        "Schoenfeld et al. (2016). Effects of Resistance Training Frequency"
+      ]
+    }
+  },
+  
+  "progressive_overload": {
+    "weight_increase": {
+      "beginner_weekly": "2.5-5%",
+      "intermediate_weekly": "2.5-5%",
+      "advanced_weekly": "1-2.5%",
+      "description": "Gradual increase in weight to stimulate adaptation",
+      "confidence": "high",
+      "flexibility": "medium",
+      "reasoning": "Progressive overload is well-established, but the exact rate varies hugely by individual, training age, and goals.",
+      "emphasis": "principle",
+      "sources": [
+        "Kraemer & Ratamess (2004). Fundamentals of resistance training",
+        "ACSM Position Stand (2009). Progression models in resistance training"
+      ],
+      "notes": "Increase weight when you can complete all sets with 1-2 reps in reserve. Beginners may progress faster, advanced lifters much slower. Plateaus are normal."
+    },
+    "volume_increase": {
+      "method": "Add 1-2 sets per exercise or 1-2 reps per set",
+      "frequency": "Weekly or bi-weekly",
+      "description": "Can increase volume (sets x reps) instead of or in addition to weight",
+      "sources": [
+        "Schoenfeld et al. (2017). Dose-response relationship between weekly resistance training volume and increases in muscle mass"
+      ]
+    },
+    "frequency_increase": {
+      "method": "Add training sessions per week for same muscle group",
+      "optimal": "2-3 times per week per muscle group",
+      "description": "Increasing training frequency can improve results",
+      "sources": [
+        "Schoenfeld et al. (2016). Effects of Resistance Training Frequency"
+      ]
+    }
+  },
+  
+  "volume": {
+    "sets_per_muscle_group": {
+      "beginner_per_week": "10-15",
+      "intermediate_per_week": "15-20",
+      "advanced_per_week": "20-25",
+      "description": "Total sets per muscle group per week for optimal hypertrophy",
+      "confidence": "medium",
+      "flexibility": "high",
+      "reasoning": "More volume generally = more growth, but optimal volume varies hugely by individual, training age, and recovery capacity.",
+      "emphasis": "user_data",
+      "sources": [
+        "Schoenfeld et al. (2017). Dose-response relationship between weekly resistance training volume",
+        "Krieger (2010). Single vs. multiple sets of resistance exercise"
+      ],
+      "notes": "Volume should be distributed across 2-3 sessions per week. This is a guideline - adjust based on your recovery and progress. Individual variation is huge."
+    },
+    "reps_per_set": {
+      "strength": "1-5 reps",
+      "hypertrophy": "6-12 reps",
+      "endurance": "15+ reps",
+      "description": "Rep ranges for different training goals",
+      "sources": [
+        "Schoenfeld (2010). The mechanisms of muscle hypertrophy",
+        "ACSM Position Stand (2009). Progression models in resistance training"
+      ],
+      "notes": "Most people training for general fitness should focus on 6-12 reps for hypertrophy"
+    },
+    "rest_periods": {
+      "strength": "3-5 minutes",
+      "hypertrophy": "1-2 minutes",
+      "endurance": "30-60 seconds",
+      "description": "Rest periods between sets",
+      "sources": [
+        "Schoenfeld et al. (2016). Effects of rest interval length on training adaptations"
+      ]
+    }
+  },
+  
+  "frequency": {
+    "per_muscle_group": {
+      "minimum": "2 times per week",
+      "optimal": "2-3 times per week",
+      "maximum": "4-5 times per week (advanced only)",
+      "description": "Training frequency per muscle group",
+      "confidence": "medium",
+      "flexibility": "high",
+      "reasoning": "2-3x per week seems optimal for most, but some do well with 1x/week, others with 4-5x/week (with lower volume per session). Individual variation is huge.",
+      "emphasis": "user_data",
+      "sources": [
+        "Schoenfeld et al. (2016). Effects of Resistance Training Frequency",
+        "Grgic et al. (2018). The effects of resistance training frequency"
+      ],
+      "notes": "Beginners can see results with 2x/week. Intermediate/advanced may benefit from 3x/week. This is a guideline - adjust based on your recovery and progress."
+    },
+    "workout_split_examples": {
+      "full_body": {
+        "frequency": "3 times per week",
+        "example": "Monday, Wednesday, Friday",
+        "description": "Train all major muscle groups each session"
+      },
+      "upper_lower": {
+        "frequency": "4 times per week",
+        "example": "Upper: Monday/Thursday, Lower: Tuesday/Friday",
+        "description": "Alternate between upper and lower body"
+      },
+      "push_pull_legs": {
+        "frequency": "3-6 times per week",
+        "example": "Push (chest/shoulders/triceps), Pull (back/biceps), Legs",
+        "description": "Group exercises by movement pattern"
+      }
+    }
+  },
+  
+  "muscle_groups": {
+    "categorization": {
+      "chest": {
+        "primary_exercises": ["bench press", "push-up", "chest press", "dumbbell press", "incline press"],
+        "synergists": ["shoulders", "triceps"],
+        "recovery_hours": 48
+      },
+      "back": {
+        "primary_exercises": ["pull-up", "row", "lat pulldown", "deadlift", "barbell row"],
+        "synergists": ["biceps", "rear delts"],
+        "recovery_hours": 48
+      },
+      "shoulders": {
+        "primary_exercises": ["shoulder press", "lateral raise", "rear delt fly", "overhead press"],
+        "synergists": ["triceps", "traps"],
+        "recovery_hours": 48
+      },
+      "legs": {
+        "primary_exercises": ["squat", "deadlift", "leg press", "lunges", "leg curl", "leg extension"],
+        "synergists": ["glutes", "calves"],
+        "recovery_hours": 72
+      },
+      "arms": {
+        "biceps": {
+          "primary_exercises": ["bicep curl", "hammer curl", "chin-up"],
+          "recovery_hours": 48
+        },
+        "triceps": {
+          "primary_exercises": ["tricep extension", "dip", "close-grip press"],
+          "recovery_hours": 48
+        }
+      },
+      "core": {
+        "primary_exercises": ["plank", "deadlift", "squat", "ab exercises"],
+        "recovery_hours": 24,
+        "notes": "Core can be trained more frequently, often worked indirectly"
+      }
+    }
+  },
+  
+  "exercise_selection": {
+    "compound_movements": {
+      "priority": "high",
+      "description": "Multi-joint exercises should form the foundation",
+      "confidence": "high",
+      "flexibility": "low",
+      "reasoning": "Well-established principle - compound movements are efficient and effective. This is a strong recommendation.",
+      "emphasis": "principle",
+      "examples": ["squat", "deadlift", "bench press", "row", "overhead press", "pull-up"],
+      "benefits": ["More muscle groups", "Greater strength gains", "Time efficient"],
+      "sources": [
+        "ACSM Position Stand (2009). Progression models in resistance training"
+      ]
+    },
+    "isolation_movements": {
+      "priority": "supplementary",
+      "description": "Single-joint exercises for specific muscle groups",
+      "examples": ["bicep curl", "tricep extension", "lateral raise", "leg curl"],
+      "benefits": ["Target specific muscles", "Address weaknesses", "Volume addition"],
+      "notes": "Should complement, not replace, compound movements"
+    }
+  },
+  
+  "workout_structure": {
+    "warm_up": {
+      "duration": "5-10 minutes",
+      "components": ["Light cardio", "Dynamic stretching", "Movement prep"],
+      "description": "Prepare body for training"
+    },
+    "main_workout": {
+      "order": "Compound movements first, then isolation",
+      "description": "Prioritize heavy, complex movements when fresh"
+    },
+    "cool_down": {
+      "duration": "5-10 minutes",
+      "components": ["Static stretching", "Light movement"],
+      "description": "Aid recovery and flexibility"
+    }
+  },
+  
+  "principles": {
+    "specificity": {
+      "description": "Training should be specific to your goals",
+      "application": "If goal is strength, train in 1-5 rep range. If hypertrophy, 6-12 reps."
+    },
+    "overload": {
+      "description": "Must progressively challenge the body to adapt",
+      "application": "Increase weight, volume, or frequency over time"
+    },
+    "variation": {
+      "description": "Periodic changes prevent plateaus",
+      "application": "Change exercises, rep ranges, or training methods every 4-8 weeks",
+      "sources": [
+        "Kraemer & Ratamess (2004). Fundamentals of resistance training"
+      ]
+    },
+    "individualization": {
+      "description": "Training should be tailored to individual needs, experience, and recovery capacity",
+      "application": "Adjust volume, frequency, and intensity based on individual response"
+    }
+  },
+  
+  "common_mistakes": {
+    "overtraining": {
+      "symptoms": ["Persistent fatigue", "Decreased performance", "Increased injury risk"],
+      "prevention": "Ensure adequate recovery (48-72 hours between muscle groups)"
+    },
+    "insufficient_progression": {
+      "description": "Not progressively overloading",
+      "prevention": "Track workouts and increase weight/volume systematically"
+    },
+    "poor_exercise_selection": {
+      "description": "Too much isolation, not enough compound movements",
+      "prevention": "Prioritize compound movements, use isolation as supplement"
+    },
+    "inadequate_recovery": {
+      "description": "Training same muscle groups too frequently",
+      "prevention": "Respect 48-72 hour recovery window"
+    }
+  },
+  
+  "plateau_breaking": {
+    "strategies": [
+      "Deload week (reduce volume by 50% for 1 week)",
+      "Change exercise selection",
+      "Modify rep ranges",
+      "Increase rest periods",
+      "Ensure adequate recovery and nutrition"
+    ],
+    "sources": [
+      "Kraemer & Ratamess (2004). Fundamentals of resistance training"
+    ]
+  },
+  
+  "citations": {
+    "primary_sources": [
+      "Schoenfeld, B. J., et al. (2016). Effects of Resistance Training Frequency on Measures of Muscle Hypertrophy: A Systematic Review and Meta-Analysis. Sports Medicine, 46(11), 1689-1697.",
+      "Schoenfeld, B. J., et al. (2017). Dose-response relationship between weekly resistance training volume and increases in muscle mass: A systematic review and meta-analysis. Journal of Sports Sciences, 35(11), 1073-1082.",
+      "ACSM Position Stand (2009). Progression models in resistance training for healthy adults. Medicine & Science in Sports & Exercise, 41(3), 687-708.",
+      "Kraemer, W. J., & Ratamess, N. A. (2004). Fundamentals of resistance training: progression and exercise prescription. Medicine & Science in Sports & Exercise, 36(4), 674-688.",
+      "Schoenfeld, B. J. (2010). The mechanisms of muscle hypertrophy and their application to resistance training. Journal of Strength and Conditioning Research, 24(10), 2857-2872.",
+      "Grgic, J., et al. (2018). The effects of resistance training frequency on muscle hypertrophy: A systematic review and meta-analysis. Sports Medicine, 48(5), 1207-1240.",
+      "Krieger, J. W. (2010). Single vs. multiple sets of resistance exercise for muscle hypertrophy: A meta-analysis. Journal of Strength and Conditioning Research, 24(4), 1150-1159."
+    ],
+    "notes": "This knowledge base is based on peer-reviewed research in exercise science. Recommendations are evidence-based but should be adapted to individual needs."
+  }
+}
+

@@ -1,0 +1,15 @@
+{
+  "daily": {
+    "2025-11-13": {
+      "input_tokens": 584948,
+      "output_tokens": 3165,
+      "cost": 1.8023189999999993,
+      "requests": 64
+    }
+  },
+  "total": {
+    "input_tokens": 584948,
+    "output_tokens": 3165,
+    "cost": 1.8023189999999993
+  }
+}

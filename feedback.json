@@ -1,0 +1,42 @@
+[
+  {
+    "timestamp": "2025-11-13T00:52:26.875Z",
+    "suggestion": "Suggestion: Chest, legs, arms focus\n\nThis workout focuses on muscle groups ready for training (chest, legs, arms) while allowing more recovery for back and shoulders.\n\ndumbbell bench - 90 * 6, 6, 5\nincline dumbbell - 65 * 6, 8, 8\ntricep ext - 65 * 6, 6, 8\nsplit squats - 80 * 7, 8, 8\none leg calf raises - 80 (1 dumbbell) * 10, 10, 10\nbicep curl - 60 * 6, 6, 4",
+    "feedback": "OK, I like how you show the suggestion thing the thing that I don\u2019t like here is in the one sentence summary you\u2019re saying this workout focuses on it\u2019s it\u2019s fluff. I don\u2019t need to know that right like the context we already know that this is a workout suggestion, so it should be much briefer than that right it should look something like and it doesn\u2019t need to be exactly this. You know you can improve on this, but we can look something like maybe it\u2019s just like a few sentences for like the key goal of this workout like for an example it can be like last exercised one week ago Keagle hit a new PR. I don\u2019t know something like that right or it could be like last exercised three weeks ago Keagle maintain previous weight. Those are just examples and I want those to be backed up with scientific research, but does that make sense as a way to format it."
+  },
+  {
+    "timestamp": "2025-11-13T01:02:08.071Z",
+    "suggestion": "Suggestion: Chest, shoulders, arms focus\n\nLast exercised 1 day ago, ready for progressive overload.\n\ndumbbell bench - 90 * 6, 6, 6\nshoulder press dumbbell - 65 * 6, 6, 6 \nbicep curl - 60 * 8, 8, 6\ntricep ext - 65 * 8, 8, 6\npull-up - 0 * 15, 10, 10",
+    "feedback": "OK, couple things on this suggestion thing number one is last exercise one day ago doesn\u2019t make any sense. It\u2019s not even correct for one and like I don\u2019t want to be working out like I don\u2019t want to be working out something from one day ago like why would I work out something from one day ago ready for progressive overload that makes no sense to is the actual workouts here they\u2019re pretty good but I want the UI to be like to only show one set right cause it\u2019s a suggestion"
+  },
+  {
+    "timestamp": "2025-11-13T01:04:46.136Z",
+    "suggestion": "Suggestion: Focus on progressive shoulders, arms\n\nHaven't trained shoulders and arms in over 2 weeks, time for a progressive overload.\n\ndumbbell shoulder press - 80 * 6\nbicep curl - 60 * 8\ndumbbell row - 80 * 8\npull-up - bodyweight * 12",
+    "feedback": "OK, well this is just wrong have trained my shoulders very recently just like a couple days yeah this is just wrong"
+  },
+  {
+    "timestamp": "2025-11-13T01:05:15.994Z",
+    "suggestion": "Suggestion: Targeted back and shoulder workout\n\nLast trained back and shoulders 1.8 days ago, ready for progressive overload.\n\ndumbbell shoulder press - 80 * 6\nlat pull-down - 160 * 8\nseated cable row - 160 * 8",
+    "feedback": "OK, this is weird you\u2019re saying we lost your shoulders 1.8 days ago yeah I want a whole number that makes"
+  },
+  {
+    "timestamp": "2025-11-13T01:05:53.745Z",
+    "suggestion": "Suggestion: Progressive overload upper body workout\n\nLast trained shoulders and back 1.8 days ago, ready for slight weight increase.\n\ndumbbell shoulder press - 80 * 6\nbicep curl - 60 * 7\ndumbbell row - 80 * 8\npull-up - 0 * 15\nshrug - 80 * 6\nlat raise - 30 * 5",
+    "feedback": "OK the same weird issues as before on shoulders I mean actually I think it\u2019s right that I trained at 1.8 days ago but like that shouldn\u2019t be the thing that recommendation engine should be picking the recommendation engine should be picking something else"
+  },
+  {
+    "timestamp": "2025-11-13T01:09:48.294Z",
+    "suggestion": "Suggestion: Chest, arm, and leg focus\n\nLast exercised 1 day ago, ready to progressively overload chest and arms. Haven't trained legs in 7 days, maintain previous weight.\n\ndumbbell bench - 90 * 6\nbicep curl - 60 * 8\nsplit squat - 75 * 8",
+    "feedback": "yeah, OK this is just wrong too. I think what\u2019s happening here is I don\u2019t think we\u2019ve built in enough structure to actually read each individual workout right? I don\u2019t know exactly how to fix that but let\u2019s figure it out. I think we need some structure to like better better categorize the actual workouts that are happening. It\u2019s like some data normalization process yeah."
+  },
+  {
+    "timestamp": "2025-11-13T01:14:58.740Z",
+    "suggestion": "Suggestion: Chest, arm, and core focus\n\nLast exercised 3 days ago, ready for progressive overload.\n\ndumbbell bench - 90 * 6\nbicep curl - 55 * 8\nincline dumbbell - 60 * 8",
+    "feedback": "OK, a couple ready for progressive overload every single suggestion pretty much that\u2019s kind of useless. Honestly, the little scented suggestion is pretty useless. I might even just remove it like the whole last exercise X days ago ready for progressive overload like all the variations of that it\u2019s kind of useless. Let\u2019s get rid of that and let\u2019s just focus on the actual exercise themselves right so this suggestion dumbbell a bunch that\u2019s a good that\u2019s a good suggestion bicep curl. I did that a few days ago actually, I think what matters is like you should be able to know you should be able to suggest how many days ago I did each individual exercise right each individual exercise. We should make sure that we\u2019ve done at least you know that we\u2019ve it\u2019s been at least a few days and preferably we pick an exercise that I haven\u2019t done in a while."
+  },
+  {
+    "timestamp": "2025-11-13T01:59:15.874Z",
+    "suggestion": "[Varied upper/lower split workout]\n\ndumbbell bench - 90 * 6\nincline dumbbell - 65 * 8 \ntricep pulldown - 65 * 7\nshoulder press barbell - 95 * 4\nlat pulldown - 145 * 10\nsit-up - 20 * 12",
+    "feedback": "We shouldn\u2019t have brackets in the of the up we shouldn\u2019t have brackets in the upper lower split that you\u2019re showing that\u2019s not right"
+  }
+]

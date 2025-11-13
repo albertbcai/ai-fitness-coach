@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <style>
+        /* Safari mobile horizontal scroll fix */
+        @supports (-webkit-touch-callout: none) {
+            html, body {
+                overflow-x: hidden !important;
+                width: 100% !important;
+                max-width: 100vw !important;
+                position: relative;
+            }
+            * {
+                max-width: 100vw;
+            }
+        }
+    </style>
+    <title>Workout Notes</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="header-row">
+            <h1 style="margin: 0;">Workout Notes</h1>
+            <button class="feedback-btn" id="feedback-btn" title="Send feedback">💬</button>
+        </div>
+        <main class="notes-view">
+            <!-- New Entry at Top -->
+            <div class="new-entry-section">
+                <!-- Recovery Check -->
+                <div id="recovery-check" class="recovery-check" style="display: none;">
+                    <div class="recovery-content">
+                        <span id="recovery-text"></span>
+                        <div class="recovery-actions">
+                            <button id="add-neglected-workout-btn" class="add-neglected-btn" style="display: none;">Add</button>
+                            <button id="close-recovery-btn" class="close-recovery-btn">×</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="suggestion-header">
+                    <div id="current-date" class="current-date"></div>
+                </div>
+                
+                <textarea 
+                    id="new-workout-input" 
+                    class="new-entry-input"
+                    placeholder="Add your workout or click 'Copy' on a previous workout..."
+                ></textarea>
+                
+                <!-- Progressive Overload Suggestions -->
+                <div id="progressive-overload-suggestions" class="progressive-overload-suggestions" style="display: none;">
+                    <div class="suggestions-header">
+                        <span class="suggestions-title">Progressive Overload Suggestions</span>
+                        <button id="close-suggestions-btn" class="close-suggestions-btn">×</button>
+                    </div>
+                    <div id="suggestions-content" class="suggestions-content"></div>
+                </div>
+                
+                <div class="action-buttons">
+                    <button id="add-workout-btn" class="btn-primary">Add</button>
+                    <button id="analytics-toggle-btn" class="analytics-toggle-btn">Coach ✨</button>
+                </div>
+            </div>
+
+            <!-- Post-Workout Insight -->
+            <div id="post-workout-insight" class="post-workout-insight" style="display: none;">
+                <div class="insight-content">
+                    <span id="insight-text"></span>
+                    <button id="close-insight-btn" class="close-insight-btn">×</button>
+                </div>
+            </div>
+
+            <!-- Analytics Section -->
+            <div id="analytics-section" class="analytics-section" style="display: none;">
+                <div class="analytics-header">
+                    <h3 class="analytics-title">Coach ✨</h3>
+                    <button id="close-analytics-btn" class="close-analytics-btn">×</button>
+                </div>
+                <div id="analytics-content" class="analytics-content">
+                    <!-- Content loaded dynamically -->
+                </div>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="search-container">
+            <div class="search-input-wrapper">
+                <span class="search-icon">🔍</span>
+                <input 
+                    type="text" 
+                    id="workout-search" 
+                    class="workout-search-input" 
+                    placeholder="Search workouts..."
+                    autocomplete="off"
+                />
+                <button class="search-clear-btn" id="search-clear-btn" style="display: none;">✕</button>
+            </div>
+                <div class="suggested-searches">
+                    <button class="suggested-search-btn" data-query="chest workout">Chest</button>
+                    <button class="suggested-search-btn" data-query="leg day">Legs</button>
+                    <button class="suggested-search-btn" data-query="upper body">Upper Body</button>
+                    <button class="suggested-search-btn" data-query="PR personal record">PR</button>
+                    <button class="suggested-search-btn" data-query="full body">Full Body</button>
+                </div>
+            </div>
+
+            <!-- Workout Entries (Chronological) -->
+            <div id="workout-entries" class="workout-entries">
+                <!-- Entries will be loaded here -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Feedback Modal -->
+    <div id="feedback-modal" class="feedback-modal" style="display: none;">
+        <div class="feedback-modal-content">
+            <div class="feedback-modal-header">
+                <h3>Send Feedback</h3>
+                <button class="feedback-modal-close" id="feedback-modal-close">✕</button>
+            </div>
+            <textarea 
+                id="feedback-text" 
+                class="feedback-textarea" 
+                placeholder="What's on your mind? (bugs, features, improvements...)"
+                rows="5"
+            ></textarea>
+            <div class="feedback-modal-actions">
+                <button class="feedback-submit-btn" id="feedback-submit-btn">Send</button>
+                <button class="feedback-cancel-btn" id="feedback-cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

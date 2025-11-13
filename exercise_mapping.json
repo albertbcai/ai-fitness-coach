@@ -1,0 +1,137 @@
+{
+  "version": "1.0",
+  "description": "Exercise name normalization and muscle group mapping",
+  "mappings": {
+    "bicep curl": {
+      "normalized": "bicep curl",
+      "muscle_groups": ["arms", "biceps"],
+      "variations": ["bicep curl", "bicep curls", "biceps curl", "biceps curls"]
+    },
+    "tricep ext": {
+      "normalized": "tricep extension",
+      "muscle_groups": ["arms", "triceps"],
+      "variations": ["tricep ext", "tricep extension", "tricep extensions", "triceps ext", "triceps extension"]
+    },
+    "dumbbell bench": {
+      "normalized": "dumbbell bench press",
+      "muscle_groups": ["chest"],
+      "variations": ["dumbbell bench", "dumbbell bench press", "db bench", "db bench press"]
+    },
+    "smith bench": {
+      "normalized": "smith bench press",
+      "muscle_groups": ["chest"],
+      "variations": ["smith bench", "smith bench press", "smith machine bench"]
+    },
+    "incline dumbbell": {
+      "normalized": "incline dumbbell press",
+      "muscle_groups": ["chest"],
+      "variations": ["incline dumbbell", "incline dumbbell press", "incline db press"]
+    },
+    "lat raise": {
+      "normalized": "lateral raise",
+      "muscle_groups": ["shoulders"],
+      "variations": ["lat raise", "lateral raise", "side raise", "lateral raises"]
+    },
+    "shrug": {
+      "normalized": "shrug",
+      "muscle_groups": ["shoulders", "back"],
+      "variations": ["shrug", "shrugs", "trap shrug"]
+    },
+    "one leg calf raises": {
+      "normalized": "single leg calf raise",
+      "muscle_groups": ["legs", "calves"],
+      "variations": ["one leg calf raises", "single leg calf raise", "one leg calf raise", "single leg calf raises"]
+    },
+    "dips": {
+      "normalized": "dips",
+      "muscle_groups": ["arms", "triceps", "chest"],
+      "variations": ["dips", "dip", "tricep dips", "chest dips"]
+    },
+    "pull-up": {
+      "normalized": "pull-up",
+      "muscle_groups": ["back", "arms", "biceps"],
+      "variations": ["pull-up", "pull-up", "pullups", "pull ups", "chin-up"]
+    },
+    "pull-ups": {
+      "normalized": "pull-up",
+      "muscle_groups": ["back", "arms", "biceps"],
+      "variations": ["pull-ups", "pullups", "pull ups"]
+    },
+    "pushup": {
+      "normalized": "push-up",
+      "muscle_groups": ["chest", "arms", "triceps"],
+      "variations": ["pushup", "push-up", "push ups", "pushups"]
+    },
+    "1 hand pushup": {
+      "normalized": "one arm push-up",
+      "muscle_groups": ["chest", "arms", "triceps", "core"],
+      "variations": ["1 hand pushup", "one hand pushup", "one arm push-up", "single arm push-up"]
+    },
+    "1 arm pullup": {
+      "normalized": "one arm pull-up",
+      "muscle_groups": ["back", "arms", "biceps"],
+      "variations": ["1 arm pullup", "one arm pullup", "one arm pull-up", "single arm pull-up"]
+    },
+    "shoulder press dumbbell": {
+      "normalized": "dumbbell shoulder press",
+      "muscle_groups": ["shoulders"],
+      "variations": ["shoulder press dumbbell", "dumbbell shoulder press", "db shoulder press"]
+    },
+    "shoulder press barbell": {
+      "normalized": "barbell shoulder press",
+      "muscle_groups": ["shoulders"],
+      "variations": ["shoulder press barbell", "barbell shoulder press", "bb shoulder press", "overhead press"]
+    },
+    "standing dumbbell shoulder press": {
+      "normalized": "dumbbell shoulder press",
+      "muscle_groups": ["shoulders"],
+      "variations": ["standing dumbbell shoulder press", "dumbbell shoulder press"]
+    },
+    "kneel shoulder press": {
+      "normalized": "kneeling shoulder press",
+      "muscle_groups": ["shoulders"],
+      "variations": ["kneel shoulder press", "kneeling shoulder press"]
+    },
+    "dumbbell row": {
+      "normalized": "dumbbell row",
+      "muscle_groups": ["back"],
+      "variations": ["dumbbell row", "db row", "bent over row"]
+    },
+    "split squats": {
+      "normalized": "split squat",
+      "muscle_groups": ["legs"],
+      "variations": ["split squats", "split squat", "lunges", "lunge"]
+    },
+    "split squats dumbbell": {
+      "normalized": "dumbbell split squat",
+      "muscle_groups": ["legs"],
+      "variations": ["split squats dumbbell", "dumbbell split squat", "db split squat"]
+    },
+    "squats dumbbell": {
+      "normalized": "dumbbell squat",
+      "muscle_groups": ["legs"],
+      "variations": ["squats dumbbell", "dumbbell squat", "db squat"]
+    },
+    "dumbbell squat": {
+      "normalized": "dumbbell squat",
+      "muscle_groups": ["legs"],
+      "variations": ["dumbbell squat", "db squat"]
+    },
+    "smith squats": {
+      "normalized": "smith squat",
+      "muscle_groups": ["legs"],
+      "variations": ["smith squats", "smith squat", "smith machine squat"]
+    },
+    "squat": {
+      "normalized": "squat",
+      "muscle_groups": ["legs"],
+      "variations": ["squat", "squats", "barbell squat"]
+    },
+    "split squat": {
+      "normalized": "split squat",
+      "muscle_groups": ["legs"],
+      "variations": ["split squat", "split squats", "lunge"]
+    }
+  }
+}
+
