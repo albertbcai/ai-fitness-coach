@@ -1431,6 +1431,8 @@ def register():
     session.permanent = True
     session['user_id'] = user_id
     session['username'] = username
+    # Explicitly mark session as modified to ensure it's saved
+    session.modified = True
     
     return jsonify({
         'success': True,
@@ -1459,6 +1461,8 @@ def login():
     session.permanent = True
     session['user_id'] = user_id
     session['username'] = username
+    # Explicitly mark session as modified to ensure it's saved
+    session.modified = True
     
     return jsonify({
         'success': True,
