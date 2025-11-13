@@ -1,3 +1,32 @@
+
+11/13/25 2:07 AM
+
+Final test - Deadlift 315 * 3
+
+11/13/25 2:06 AM
+
+Test workout 2 - Squat 225 * 5
+
+11/13/25 2:05 AM
+
+Test workout - Bench Press 135 * 5
+
+11/13/25 2:04 AM
+
+bicep curl - 0 * 10
+tricep extension - 0 * 10
+dumbbell bench press - 0 * 10
+shrug - 0 * 10
+single leg calf raise - 0 * 10
+
+11/13/25 1:58 AM
+
+smith bench press - 225 * 5
+smith squats - 195 * 10
+one leg calf raises - 75 * 10
+tricep ext - 60 * 6
+dumbbell bench - 85 * 6
+split squats - 75 * 7
 Workout
 
 11/11/25

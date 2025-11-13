@@ -17,14 +17,43 @@
             }
         }
     </style>
-    <title>Workout Notes</title>
+    <title>Notes</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <div class="container">
+    <!-- Login Modal -->
+    <div id="login-modal" class="login-modal" style="display: none;">
+        <div class="login-content">
+            <h2>Welcome to Workout Notes</h2>
+            <div id="login-form">
+                <input type="text" id="login-username" placeholder="Username" autocomplete="username">
+                <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
+                <button id="login-submit-btn" class="btn-primary">Login</button>
+                <p style="text-align: center; margin-top: 10px;">
+                    Don't have an account? <a href="#" id="show-register-link">Register</a>
+                </p>
+                <div id="login-error" class="error-message" style="display: none;"></div>
+            </div>
+            <div id="register-form" style="display: none;">
+                <input type="text" id="register-username" placeholder="Username (min 3 chars)" autocomplete="username">
+                <input type="password" id="register-password" placeholder="Password (min 6 chars)" autocomplete="new-password">
+                <button id="register-submit-btn" class="btn-primary">Register</button>
+                <p style="text-align: center; margin-top: 10px;">
+                    Already have an account? <a href="#" id="show-login-link">Login</a>
+                </p>
+                <div id="register-error" class="error-message" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container" id="main-container" style="display: none;">
         <div class="header-row">
-            <h1 style="margin: 0;">Workout Notes</h1>
-            <button class="feedback-btn" id="feedback-btn" title="Send feedback">💬</button>
+            <span id="user-info" style="font-size: 14px; color: #8b949e;"></span>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button class="header-text-btn" id="export-workouts-btn">Export</button>
+                <button class="header-text-btn" id="logout-btn">Log out</button>
+                <button class="header-text-btn" id="feedback-btn">Feedback</button>
+            </div>
         </div>
         <main class="notes-view">
             <!-- New Entry at Top -->

@@ -62,6 +62,29 @@ body::-webkit-scrollbar {
     padding: 0 4px;
 }
 
+.header-text-btn {
+    background: transparent;
+    border: 1px solid #30363d;
+    color: #8b949e;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    font-family: inherit;
+    font-weight: 400;
+}
+
+.header-text-btn:hover {
+    background: #21262d;
+    border-color: #30363d;
+    color: #e6edf3;
+}
+
+.header-text-btn:active {
+    background: #161b22;
+}
+
 .feedback-btn {
     background: transparent;
     border: 1px solid #30363d;
@@ -813,6 +836,7 @@ h1 {
     padding: 0;
 }
 
+
 .search-input-wrapper {
     position: relative;
     display: flex;
@@ -1308,6 +1332,86 @@ button {
     display: none;
 }
 
+/* Login Modal */
+.login-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(13, 17, 23, 0.95);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+}
+
+.login-content {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 32px;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.login-content h2 {
+    margin-bottom: 24px;
+    text-align: center;
+    color: #e6edf3;
+}
+
+.login-content input {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 16px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #e6edf3;
+    font-size: 14px;
+    font-family: inherit;
+}
+
+.login-content input:focus {
+    outline: none;
+    border-color: #58a6ff;
+}
+
+.login-content button {
+    width: 100%;
+    padding: 12px;
+    background: #238636;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.login-content button:hover {
+    background: #2ea043;
+}
+
+.login-content a {
+    color: #58a6ff;
+    text-decoration: none;
+}
+
+.login-content a:hover {
+    text-decoration: underline;
+}
+
+.error-message {
+    color: #f85149;
+    font-size: 14px;
+    margin-top: 12px;
+    text-align: center;
+}
+
 /* Responsive */
 @media (max-width: 600px) {
     .container {
@@ -1320,5 +1424,9 @@ button {
     
     .ai-insights-panel {
         width: 100%;
+    }
+    
+    .login-content {
+        padding: 24px;
     }
 }

@@ -22,6 +22,7 @@ const analyticsToggleBtn = document.getElementById('analytics-toggle-btn');
 const closeAnalyticsBtn = document.getElementById('close-analytics-btn');
 const workoutSearchInput = document.getElementById('workout-search');
 const searchClearBtn = document.getElementById('search-clear-btn');
+const exportWorkoutsBtn = document.getElementById('export-workouts-btn');
 const feedbackBtn = document.getElementById('feedback-btn');
 const feedbackModal = document.getElementById('feedback-modal');
 const feedbackModalClose = document.getElementById('feedback-modal-close');
@@ -29,10 +30,156 @@ const feedbackCancelBtn = document.getElementById('feedback-cancel-btn');
 const feedbackSubmitBtn = document.getElementById('feedback-submit-btn');
 const feedbackText = document.getElementById('feedback-text');
 
-// Load workouts on page load
-loadWorkouts();
-updateCurrentDate();
-loadRecoveryCheck();
+// Authentication state
+let currentUser = null;
+
+// Check authentication on page load
+checkAuth();
+
+// Authentication functions
+async function checkAuth() {
+    try {
+        const response = await fetch('/api/current-user');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.authenticated) {
+                currentUser = data;
+                showMainApp();
+            } else {
+                showLoginModal();
+            }
+        } else {
+            showLoginModal();
+        }
+    } catch (error) {
+        console.error('Error checking auth:', error);
+        showLoginModal();
+    }
+}
+
+function showLoginModal() {
+    document.getElementById('login-modal').style.display = 'flex';
+    document.getElementById('main-container').style.display = 'none';
+}
+
+function showMainApp() {
+    document.getElementById('login-modal').style.display = 'none';
+    document.getElementById('main-container').style.display = 'block';
+    if (currentUser) {
+        document.getElementById('user-info').textContent = currentUser.username;
+    }
+    // Load workouts after showing app
+    loadWorkouts();
+    updateCurrentDate();
+    loadRecoveryCheck();
+}
+
+// Login form handlers
+document.getElementById('login-submit-btn').addEventListener('click', async () => {
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value;
+    const errorDiv = document.getElementById('login-error');
+    
+    if (!username || !password) {
+        errorDiv.textContent = 'Please enter username and password';
+        errorDiv.style.display = 'block';
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        
+        const data = await response.json();
+        if (response.ok && data.success) {
+            currentUser = data;
+            showMainApp();
+        } else {
+            errorDiv.textContent = data.error || 'Login failed';
+            errorDiv.style.display = 'block';
+        }
+    } catch (error) {
+        errorDiv.textContent = 'Error connecting to server';
+        errorDiv.style.display = 'block';
+    }
+});
+
+// Register form handlers
+document.getElementById('register-submit-btn').addEventListener('click', async () => {
+    const username = document.getElementById('register-username').value.trim();
+    const password = document.getElementById('register-password').value;
+    const errorDiv = document.getElementById('register-error');
+    
+    if (!username || !password) {
+        errorDiv.textContent = 'Please enter username and password';
+        errorDiv.style.display = 'block';
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        
+        const data = await response.json();
+        if (response.ok && data.success) {
+            currentUser = data;
+            showMainApp();
+        } else {
+            errorDiv.textContent = data.error || 'Registration failed';
+            errorDiv.style.display = 'block';
+        }
+    } catch (error) {
+        errorDiv.textContent = 'Error connecting to server';
+        errorDiv.style.display = 'block';
+    }
+});
+
+// Toggle between login and register forms
+document.getElementById('show-register-link').addEventListener('click', (e) => {
+    e.preventDefault();
+    document.getElementById('login-form').style.display = 'none';
+    document.getElementById('register-form').style.display = 'block';
+    document.getElementById('login-error').style.display = 'none';
+    document.getElementById('register-error').style.display = 'none';
+});
+
+document.getElementById('show-login-link').addEventListener('click', (e) => {
+    e.preventDefault();
+    document.getElementById('register-form').style.display = 'none';
+    document.getElementById('login-form').style.display = 'block';
+    document.getElementById('login-error').style.display = 'none';
+    document.getElementById('register-error').style.display = 'none';
+});
+
+// Logout handler
+document.getElementById('logout-btn').addEventListener('click', async () => {
+    try {
+        await fetch('/api/logout', { method: 'POST' });
+        currentUser = null;
+        showLoginModal();
+    } catch (error) {
+        console.error('Error logging out:', error);
+    }
+});
+
+// Allow Enter key to submit forms
+document.getElementById('login-password').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        document.getElementById('login-submit-btn').click();
+    }
+});
+
+document.getElementById('register-password').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        document.getElementById('register-submit-btn').click();
+    }
+});
 
 // Analytics toggle
 analyticsToggleBtn.addEventListener('click', () => {
@@ -393,6 +540,30 @@ async function searchWorkouts(query) {
         renderWorkouts();
     }
 }
+
+// Export workouts as markdown
+exportWorkoutsBtn.addEventListener('click', async () => {
+    try {
+        const response = await fetch('/api/export-workouts');
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `workout-history-${new Date().toISOString().split('T')[0]}.md`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } else {
+            const data = await response.json();
+            alert(data.error || 'Failed to export workouts');
+        }
+    } catch (error) {
+        console.error('Error exporting workouts:', error);
+        alert('Error exporting workouts. Please try again.');
+    }
+});
 
 // Show/hide clear button based on input
 function updateClearButton() {
@@ -789,8 +960,25 @@ async function addWorkout() {
             // Small delay to ensure file is written, then reload
             setTimeout(async () => {
                 await loadWorkouts();
-                // Scroll to top to see the new workout
-                window.scrollTo({ top: 0, behavior: 'smooth' });
+                // Wait a bit for the insight banner to appear, then scroll to it
+                setTimeout(() => {
+                    // Scroll to the post-workout insight banner if it's visible
+                    if (postWorkoutInsight && postWorkoutInsight.style.display !== 'none') {
+                        const headerOffset = 80; // Account for header height
+                        const elementPosition = postWorkoutInsight.getBoundingClientRect().top + window.pageYOffset;
+                        const offsetPosition = elementPosition - headerOffset;
+                        window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+                    } else {
+                        // Fallback: scroll to the newly added workout (first entry)
+                        const firstEntry = workoutEntries.querySelector('.workout-entry');
+                        if (firstEntry) {
+                            const headerOffset = 80;
+                            const elementPosition = firstEntry.getBoundingClientRect().top + window.pageYOffset;
+                            const offsetPosition = elementPosition - headerOffset;
+                            window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+                        }
+                    }
+                }, 300); // Wait for insight banner to load
             }, 100);
             
             // Update date

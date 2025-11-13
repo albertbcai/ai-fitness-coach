@@ -7,15 +7,37 @@ A lightweight, notes-app-style fitness coach
 import os
 import json
 import re
+import secrets
 from pathlib import Path
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session
+from werkzeug.security import generate_password_hash, check_password_hash
 from anthropic import Anthropic
 from dotenv import load_dotenv
+from database import get_db_connection, init_db, check_db_connection, get_cursor, is_sqlite, get_db_url
+from functools import wraps
 
 load_dotenv()
 
 app = Flask(__name__)
+# Set a secret key for sessions (use environment variable or generate one)
+app.secret_key = os.getenv('SECRET_KEY', secrets.token_hex(32))
+# Make sessions permanent (persist until logout)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)  # Sessions last 1 year
+
+# Initialize database on startup
+try:
+    if check_db_connection():
+        init_db()
+        print("✓ Database initialized")
+        USE_DATABASE = True
+    else:
+        print("⚠ Database not available, falling back to file storage")
+        USE_DATABASE = False
+except Exception as e:
+    print(f"⚠ Database initialization failed: {e}")
+    print("⚠ Falling back to file storage")
+    USE_DATABASE = False
 
 # Initialize Claude client
 anthropic = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
@@ -38,8 +60,412 @@ OUTPUT_COST_PER_MILLION = 15.00  # $15 per million output tokens
 DAILY_BUDGET = float(os.getenv("DAILY_BUDGET", "1.00"))  # $1/day default
 MONTHLY_BUDGET = float(os.getenv("MONTHLY_BUDGET", "20.00"))  # $20/month default
 
-def load_usage():
-    """Load usage statistics"""
+# ============================================================================
+# Authentication Helper Functions
+# ============================================================================
+
+def get_current_user_id():
+    """Get current user ID from session - validates it's an integer for security"""
+    user_id = session.get('user_id')
+    if user_id is not None:
+        try:
+            # Ensure user_id is an integer to prevent injection
+            return int(user_id)
+        except (ValueError, TypeError):
+            return None
+    return None
+
+def require_auth(f):
+    """Decorator to require authentication for routes"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not get_current_user_id():
+            return jsonify({'error': 'Authentication required'}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
+def create_user(username, password):
+    """Create a new user - validates input to prevent SQL injection"""
+    if not USE_DATABASE:
+        return None
+    
+    # Validate and sanitize username
+    if not username or not isinstance(username, str):
+        return None
+    username = username.strip()
+    if len(username) < 3 or len(username) > 50:
+        return None
+    # Only allow alphanumeric, underscore, and hyphen
+    if not username.replace('_', '').replace('-', '').isalnum():
+        return None
+    
+    # Validate password
+    if not password or not isinstance(password, str) or len(password) < 6:
+        return None
+    
+    try:
+        db_url = get_db_url()
+        use_sqlite = is_sqlite(db_url)
+        with get_db_connection() as conn:
+            cur = get_cursor(conn)
+            # Check if username already exists - using parameterized query
+            if use_sqlite:
+                cur.execute("SELECT id FROM users WHERE username = ?", (username,))
+            else:
+                cur.execute("SELECT id FROM users WHERE username = %s", (username,))
+            if cur.fetchone():
+                return None
+            
+            # Create new user
+            password_hash = generate_password_hash(password)
+            if use_sqlite:
+                cur.execute("""
+                    INSERT INTO users (username, password_hash) 
+                    VALUES (?, ?)
+                """, (username, password_hash))
+                # For SQLite, get lastrowid from the cursor wrapper
+                user_id = cur.lastrowid
+            else:
+                cur.execute("""
+                    INSERT INTO users (username, password_hash) 
+                    VALUES (%s, %s) 
+                    RETURNING id
+                """, (username, password_hash))
+                user_id = cur.fetchone()[0]
+            return user_id
+    except Exception as e:
+        print(f"Error creating user: {e}")
+        return None
+
+def authenticate_user(username, password):
+    """Authenticate a user and return user_id if successful - validates input to prevent SQL injection"""
+    if not USE_DATABASE:
+        return None
+    
+    # Validate username
+    if not username or not isinstance(username, str):
+        return None
+    username = username.strip()
+    
+    try:
+        db_url = get_db_url()
+        use_sqlite = is_sqlite(db_url)
+        with get_db_connection() as conn:
+            cur = get_cursor(conn)
+            # Get user by username - using parameterized query (SQL injection protected)
+            if use_sqlite:
+                cur.execute("SELECT id, password_hash FROM users WHERE username = ?", (username,))
+            else:
+                cur.execute("SELECT id, password_hash FROM users WHERE username = %s", (username,))
+            result = cur.fetchone()
+            if result and check_password_hash(result[1], password):
+                return result[0]
+            return None
+    except Exception as e:
+        print(f"Error authenticating user: {e}")
+        return None
+
+# ============================================================================
+# Database Helper Functions
+# ============================================================================
+
+def get_workouts_from_db(user_id=None, limit=None):
+    """Get all workouts from database, ordered by date descending - ALWAYS filters by user_id for security"""
+    if not USE_DATABASE:
+        return None
+    
+    if not user_id:
+        user_id = get_current_user_id()
+    
+    # Security: Require user_id - never return workouts without user filter
+    # Validate user_id is an integer to prevent SQL injection
+    if not user_id:
+        return []
+    try:
+        user_id = int(user_id)
+    except (ValueError, TypeError):
+        return []
+    
+    # Validate limit if provided
+    if limit is not None:
+        try:
+            limit = int(limit)
+            if limit < 1 or limit > 1000:  # Reasonable bounds
+                limit = 100
+        except (ValueError, TypeError):
+            limit = None
+    
+    try:
+        db_url = get_db_url()
+        use_sqlite = is_sqlite(db_url)
+        with get_db_connection() as conn:
+            cur = get_cursor(conn)
+            # Always filter by user_id - SQL injection protection via parameterized queries
+            if limit:
+                if use_sqlite:
+                    cur.execute("""
+                        SELECT date, text 
+                        FROM workouts 
+                        WHERE user_id = ?
+                        ORDER BY created_at DESC
+                        LIMIT ?
+                    """, (user_id, limit))
+                else:
+                    cur.execute("""
+                        SELECT date, text 
+                        FROM workouts 
+                        WHERE user_id = %s
+                        ORDER BY created_at DESC
+                        LIMIT %s
+                    """, (user_id, limit))
+            else:
+                if use_sqlite:
+                    cur.execute("""
+                        SELECT date, text 
+                        FROM workouts 
+                        WHERE user_id = ?
+                        ORDER BY created_at DESC
+                    """, (user_id,))
+                else:
+                    cur.execute("""
+                        SELECT date, text 
+                        FROM workouts 
+                        WHERE user_id = %s
+                        ORDER BY created_at DESC
+                    """, (user_id,))
+            workouts = []
+            for row in cur.fetchall():
+                workouts.append({
+                    'date': row[0],
+                    'text': row[1]
+                })
+            return workouts
+    except Exception as e:
+        print(f"Error getting workouts from database: {e}")
+        return []
+
+def add_workout_to_db(date, text, user_id=None):
+    """Add a workout to the database"""
+    if not USE_DATABASE:
+        return False
+    
+    if not user_id:
+        user_id = get_current_user_id()
+    
+    if not user_id:
+        return False
+    
+    # Validate user_id is an integer
+    try:
+        user_id = int(user_id)
+    except (ValueError, TypeError):
+        return False
+    
+    try:
+        db_url = get_db_url()
+        use_sqlite = is_sqlite(db_url)
+        with get_db_connection() as conn:
+            cur = get_cursor(conn)
+            if use_sqlite:
+                cur.execute("""
+                    INSERT INTO workouts (date, text, user_id) 
+                    VALUES (?, ?, ?)
+                """, (date, text, user_id))
+                workout_id = cur.lastrowid
+            else:
+                cur.execute("""
+                    INSERT INTO workouts (date, text, user_id) 
+                    VALUES (%s, %s, %s) 
+                    RETURNING id
+                """, (date, text, user_id))
+                workout_id = cur.fetchone()[0]
+            return workout_id
+    except Exception as e:
+        print(f"Error adding workout to database: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+def update_workout_in_db(old_date, old_text, new_text, user_id=None):
+    """Update a workout in the database"""
+    if not USE_DATABASE:
+        return False
+    
+    if not user_id:
+        user_id = get_current_user_id()
+    
+    if not user_id:
+        return False
+    
+    try:
+        user_id = int(user_id)
+    except (ValueError, TypeError):
+        return False
+    
+    try:
+        db_url = get_db_url()
+        use_sqlite = is_sqlite(db_url)
+        with get_db_connection() as conn:
+            cur = get_cursor(conn)
+            if use_sqlite:
+                cur.execute("""
+                    UPDATE workouts 
+                    SET text = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE date = ? AND text = ? AND user_id = ?
+                """, (new_text, old_date, old_text, user_id))
+            else:
+                cur.execute("""
+                    UPDATE workouts 
+                    SET text = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE date = %s AND text = %s AND user_id = %s
+                """, (new_text, old_date, old_text, user_id))
+            return cur.rowcount > 0
+    except Exception as e:
+        print(f"Error updating workout in database: {e}")
+        return False
+
+def delete_workout_from_db(date, text, user_id=None):
+    """Delete a workout from the database"""
+    if not USE_DATABASE:
+        return False
+    
+    if not user_id:
+        user_id = get_current_user_id()
+    
+    if not user_id:
+        return False
+    
+    try:
+        user_id = int(user_id)
+    except (ValueError, TypeError):
+        return False
+    
+    try:
+        db_url = get_db_url()
+        use_sqlite = is_sqlite(db_url)
+        with get_db_connection() as conn:
+            cur = get_cursor(conn)
+            if use_sqlite:
+                cur.execute("""
+                    DELETE FROM workouts 
+                    WHERE date = ? AND text = ? AND user_id = ?
+                """, (date, text, user_id))
+            else:
+                cur.execute("""
+                    DELETE FROM workouts 
+                    WHERE date = %s AND text = %s AND user_id = %s
+                """, (date, text, user_id))
+            return cur.rowcount > 0
+    except Exception as e:
+        print(f"Error deleting workout from database: {e}")
+        return False
+
+def get_theme_from_db(workout_key, user_id=None):
+    """Get theme from database"""
+    if not USE_DATABASE:
+        return None
+    
+    if not user_id:
+        user_id = get_current_user_id()
+    
+    if not user_id:
+        return None
+    
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT theme FROM themes WHERE workout_key = %s AND user_id = %s
+                """, (workout_key, user_id))
+                result = cur.fetchone()
+                return result[0] if result else None
+    except Exception as e:
+        print(f"Error getting theme from database: {e}")
+        return None
+
+def save_theme_to_db(workout_key, theme, user_id=None):
+    """Save theme to database"""
+    if not USE_DATABASE:
+        return False
+    
+    if not user_id:
+        user_id = get_current_user_id()
+    
+    if not user_id:
+        return False
+    
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO themes (workout_key, theme, user_id) 
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (workout_key, user_id) 
+                    DO UPDATE SET theme = %s, updated_at = CURRENT_TIMESTAMP
+                """, (workout_key, theme, user_id, theme))
+                return True
+    except Exception as e:
+        print(f"Error saving theme to database: {e}")
+        return False
+
+def load_usage(user_id=None):
+    """Load usage statistics from database or file"""
+    # Don't try to get user_id from session if called outside request context
+    try:
+        if not user_id:
+            user_id = get_current_user_id()
+    except RuntimeError:
+        # Called outside request context (e.g., at startup)
+        user_id = None
+    
+    if USE_DATABASE:
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    # Get daily usage
+                    if user_id:
+                        cur.execute("""
+                            SELECT date, input_tokens, output_tokens, cost, requests
+                            FROM usage
+                            WHERE user_id = %s
+                            ORDER BY date DESC
+                        """, (user_id,))
+                    else:
+                        cur.execute("""
+                            SELECT date, input_tokens, output_tokens, cost, requests
+                            FROM usage
+                            ORDER BY date DESC
+                        """)
+                    daily = {}
+                    total_input = 0
+                    total_output = 0
+                    total_cost = 0.0
+                    
+                    for row in cur.fetchall():
+                        date_str = row[0].strftime("%Y-%m-%d")
+                        daily[date_str] = {
+                            "input_tokens": row[1],
+                            "output_tokens": row[2],
+                            "cost": float(row[3]),
+                            "requests": row[4]
+                        }
+                        total_input += row[1]
+                        total_output += row[2]
+                        total_cost += float(row[3])
+                    
+                    return {
+                        "daily": daily,
+                        "total": {
+                            "input_tokens": total_input,
+                            "output_tokens": total_output,
+                            "cost": total_cost
+                        }
+                    }
+        except Exception as e:
+            print(f"Error loading usage from database: {e}")
+            # Fall through to file-based
+    
+    # File-based fallback
     if USAGE_LOG.exists():
         try:
             return json.loads(USAGE_LOG.read_text())
@@ -658,8 +1084,33 @@ def get_knowledge_summary(knowledge_base, emphasize_user_data=True):
     
     return "\n".join(summary)
 
-def load_themes():
-    """Load saved themes"""
+def load_themes(user_id=None):
+    """Load saved themes from database or file"""
+    if not user_id:
+        user_id = get_current_user_id()
+    
+    if USE_DATABASE:
+        try:
+            db_url = get_db_url()
+            use_sqlite = is_sqlite(db_url)
+            with get_db_connection() as conn:
+                cur = get_cursor(conn)
+                if user_id:
+                    if use_sqlite:
+                        cur.execute("SELECT workout_key, theme FROM themes WHERE user_id = ?", (user_id,))
+                    else:
+                        cur.execute("SELECT workout_key, theme FROM themes WHERE user_id = %s", (user_id,))
+                else:
+                    cur.execute("SELECT workout_key, theme FROM themes")
+                themes = {}
+                for row in cur.fetchall():
+                    themes[row[0]] = row[1]
+                return themes
+        except Exception as e:
+            print(f"Error loading themes from database: {e}")
+            # Fall through to file-based
+    
+    # File-based fallback (only if no database or not authenticated)
     if THEMES_LOG.exists():
         try:
             return json.loads(THEMES_LOG.read_text())
@@ -668,7 +1119,24 @@ def load_themes():
     return {}
 
 def save_themes(themes):
-    """Save themes to file"""
+    """Save themes to database or file"""
+    if USE_DATABASE:
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    for workout_key, theme in themes.items():
+                        cur.execute("""
+                            INSERT INTO themes (workout_key, theme) 
+                            VALUES (%s, %s)
+                            ON CONFLICT (workout_key) 
+                            DO UPDATE SET theme = %s, updated_at = CURRENT_TIMESTAMP
+                        """, (workout_key, theme, theme))
+            return
+        except Exception as e:
+            print(f"Error saving themes to database: {e}")
+            # Fall through to file-based
+    
+    # File-based fallback
     THEMES_LOG.write_text(json.dumps(themes, indent=2))
 
 def get_workout_key(date, text):
@@ -687,20 +1155,46 @@ def calculate_cost(input_tokens, output_tokens):
     output_cost = (output_tokens / 1_000_000) * OUTPUT_COST_PER_MILLION
     return input_cost + output_cost
 
-def update_usage(input_tokens, output_tokens):
-    """Update usage statistics"""
-    usage = load_usage()
-    today = datetime.now().strftime("%Y-%m-%d")
+def update_usage(input_tokens, output_tokens, user_id=None):
+    """Update usage statistics in database or file"""
+    if not user_id:
+        user_id = get_current_user_id()
+    
+    today = datetime.now().date()
     cost = calculate_cost(input_tokens, output_tokens)
     
-    # Update daily usage
-    if today not in usage["daily"]:
-        usage["daily"][today] = {"input_tokens": 0, "output_tokens": 0, "cost": 0.0, "requests": 0}
+    if USE_DATABASE and user_id:
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO usage (date, input_tokens, output_tokens, cost, requests, user_id)
+                        VALUES (%s, %s, %s, %s, 1, %s)
+                        ON CONFLICT (user_id, date) 
+                        DO UPDATE SET 
+                            input_tokens = usage.input_tokens + %s,
+                            output_tokens = usage.output_tokens + %s,
+                            cost = usage.cost + %s,
+                            requests = usage.requests + 1,
+                            updated_at = CURRENT_TIMESTAMP
+                    """, (today, input_tokens, output_tokens, cost, user_id, input_tokens, output_tokens, cost))
+            return
+        except Exception as e:
+            print(f"Error updating usage in database: {e}")
+            # Fall through to file-based
     
-    usage["daily"][today]["input_tokens"] += input_tokens
-    usage["daily"][today]["output_tokens"] += output_tokens
-    usage["daily"][today]["cost"] += cost
-    usage["daily"][today]["requests"] += 1
+    # File-based fallback
+    usage = load_usage(user_id)
+    today_str = today.strftime("%Y-%m-%d")
+    
+    # Update daily usage
+    if today_str not in usage["daily"]:
+        usage["daily"][today_str] = {"input_tokens": 0, "output_tokens": 0, "cost": 0.0, "requests": 0}
+    
+    usage["daily"][today_str]["input_tokens"] += input_tokens
+    usage["daily"][today_str]["output_tokens"] += output_tokens
+    usage["daily"][today_str]["cost"] += cost
+    usage["daily"][today_str]["requests"] += 1
     
     # Update total usage
     usage["total"]["input_tokens"] += input_tokens
@@ -712,11 +1206,19 @@ def update_usage(input_tokens, output_tokens):
     usage["daily"] = {k: v for k, v in usage["daily"].items() if k >= cutoff_date}
     
     save_usage(usage)
-    return usage["daily"][today]["cost"], usage["total"]["cost"]
+    return usage["daily"].get(today_str, {}).get("cost", 0.0), usage["total"]["cost"]
 
-def check_budget():
+def check_budget(user_id=None):
     """Check if we're within budget"""
-    usage = load_usage()
+    # Don't try to get user_id from session if called outside request context
+    try:
+        if not user_id:
+            user_id = get_current_user_id()
+    except RuntimeError:
+        # Called outside request context (e.g., at startup)
+        user_id = None
+    
+    usage = load_usage(user_id)
     today = datetime.now().strftime("%Y-%m-%d")
     
     daily_cost = usage["daily"].get(today, {}).get("cost", 0.0)
@@ -766,16 +1268,145 @@ def index():
     """Main app interface"""
     return render_template('index.html')
 
+@app.route('/api/register', methods=['POST'])
+def register():
+    """Register a new user"""
+    if not USE_DATABASE:
+        return jsonify({'error': 'Database not available'}), 500
+    
+    data = request.json
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    
+    if not username or not password:
+        return jsonify({'error': 'Username and password required'}), 400
+    
+    if len(username) < 3:
+        return jsonify({'error': 'Username must be at least 3 characters'}), 400
+    
+    if len(password) < 6:
+        return jsonify({'error': 'Password must be at least 6 characters'}), 400
+    
+    user_id = create_user(username, password)
+    if not user_id:
+        return jsonify({'error': 'Username already exists'}), 400
+    
+    # Automatically log in the user with permanent session
+    session.permanent = True
+    session['user_id'] = user_id
+    session['username'] = username
+    
+    return jsonify({
+        'success': True,
+        'user_id': user_id,
+        'username': username
+    })
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    """Login a user"""
+    if not USE_DATABASE:
+        return jsonify({'error': 'Database not available'}), 500
+    
+    data = request.json
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    
+    if not username or not password:
+        return jsonify({'error': 'Username and password required'}), 400
+    
+    user_id = authenticate_user(username, password)
+    if not user_id:
+        return jsonify({'error': 'Invalid username or password'}), 401
+    
+    # Set permanent session (persists until logout)
+    session.permanent = True
+    session['user_id'] = user_id
+    session['username'] = username
+    
+    return jsonify({
+        'success': True,
+        'user_id': user_id,
+        'username': username
+    })
+
+@app.route('/api/logout', methods=['POST'])
+def logout():
+    """Logout the current user"""
+    session.clear()
+    return jsonify({'success': True})
+
+@app.route('/api/current-user', methods=['GET'])
+def get_current_user():
+    """Get current user info"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'authenticated': False}), 401
+    
+    return jsonify({
+        'authenticated': True,
+        'user_id': user_id,
+        'username': session.get('username', '')
+    })
+
+@app.route('/api/export-workouts', methods=['GET'])
+@require_auth
+def export_workouts():
+    """Export all workouts for the current user as markdown"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'error': 'Authentication required'}), 401
+    
+    # Get all workouts for the user
+    workouts = get_workouts_from_db(user_id) or []
+    
+    if not workouts:
+        return jsonify({'error': 'No workouts found'}), 404
+    
+    # Build markdown content
+    markdown_content = "# Workout History\n\n"
+    
+    for workout in workouts:
+        date = workout.get('date', '')
+        text = workout.get('text', '')
+        markdown_content += f"{date}\n\n{text}\n\n---\n\n"
+    
+    # Return as downloadable file
+    from flask import Response
+    response = Response(
+        markdown_content,
+        mimetype='text/markdown',
+        headers={
+            'Content-Disposition': f'attachment; filename=workout-history-{datetime.now().strftime("%Y%m%d")}.md'
+        }
+    )
+    return response
+
 @app.route('/api/workouts', methods=['GET'])
 def get_workouts():
-    """Get all workout entries"""
+    """Get all workout entries from database or file"""
     workouts = []
     
-    # Only load from workouts.md (single source of truth)
-    if WORKOUT_LOG.exists():
-        content = WORKOUT_LOG.read_text()
-        if content.strip():
-            workouts.extend(parse_workout_entries(content))
+    # Try database first - always use database if available and user is authenticated
+    user_id = get_current_user_id()
+    if USE_DATABASE and user_id:
+        # Authenticated user - only get their workouts from database
+        db_workouts = get_workouts_from_db(user_id)
+        if db_workouts is not None:
+            workouts = db_workouts
+    elif USE_DATABASE:
+        # Database available but not authenticated - return empty
+        workouts = []
+    else:
+        # No database - fall back to file-based (legacy mode)
+        if WORKOUT_LOG.exists():
+            content = WORKOUT_LOG.read_text()
+            if content.strip():
+                workouts.extend(parse_workout_entries(content))
+    
+    # Debug: Log if workouts are empty
+    if not workouts and USE_DATABASE:
+        print(f"DEBUG: No workouts found. user_id={user_id}, USE_DATABASE={USE_DATABASE}")
     
     # Load saved themes and attach to workouts
     themes = load_themes()
@@ -794,15 +1425,17 @@ def get_workouts():
             for fmt in ['%m/%d/%y %I:%M %p', '%m/%d/%Y %I:%M %p', '%m/%d/%y %H:%M', '%m/%d/%Y %H:%M', '%m/%d/%y', '%Y-%m-%d', '%m-%d-%y', '%m/%d/%Y']:
                 try:
                     parsed_date = datetime.strptime(workout_date_str, fmt)
-                    if parsed_date.year > today.year + 1 or (parsed_date - today).days > 1:
+                    # Only filter out future dates or dates way in the past (more than 10 years)
+                    if parsed_date.year > today.year + 1 or (today - parsed_date).days > 3650:
                         continue
                     workout_date = parsed_date
                     break
                 except:
                     continue
         
-        if not workout_date:
-            continue
+        # Don't skip workouts if date parsing fails - just use the date string as-is
+        # if not workout_date:
+        #     continue
         
         parsed_workout = parse_workout_text(workout.get('text', ''))
         for ex in parsed_workout.get('exercises', []):
@@ -980,7 +1613,7 @@ def parse_workout_entries(content):
 
 @app.route('/api/log-workout', methods=['POST'])
 def log_workout():
-    """Log a new workout entry"""
+    """Log a new workout entry to database or file"""
     data = request.json
     workout_text = data.get('workout', '')
     
@@ -992,16 +1625,27 @@ def log_workout():
     now = datetime.now()
     date_str = now.strftime('%m/%d/%y')
     time_str = now.strftime('%I:%M %p').lstrip('0')  # 12-hour format with AM/PM, remove leading zero from hour
-    new_entry = f"\n{date_str} {time_str}\n\n{workout_text}\n"
+    full_date = f"{date_str} {time_str}"
     
-    # Read existing content
-    existing = ""
-    if WORKOUT_LOG.exists():
-        existing = WORKOUT_LOG.read_text()
+    # Try database first
+    workout_id = add_workout_to_db(full_date, workout_text)
     
-    # Write with new entry at top
-    with open(WORKOUT_LOG, 'w') as f:
-        f.write(new_entry + existing)
+    if workout_id:
+        # Successfully added to database
+        # Still need to update search index and other logic
+        pass
+    else:
+        # Fall back to file-based
+        new_entry = f"\n{full_date}\n\n{workout_text}\n"
+        
+        # Read existing content
+        existing = ""
+        if WORKOUT_LOG.exists():
+            existing = WORKOUT_LOG.read_text()
+        
+        # Write with new entry at top
+        with open(WORKOUT_LOG, 'w') as f:
+            f.write(new_entry + existing)
     
     # Incrementally update search index (rule-based categories)
     # New workout is at index 0 (prepended)
@@ -1085,6 +1729,7 @@ def log_workout():
     })
 
 @app.route('/api/post-workout-insight', methods=['POST'])
+@require_auth
 def post_workout_insight():
     """Generate AI insight after logging a workout - data-driven, detects PRs and strength increases"""
     data = request.json
@@ -1105,12 +1750,9 @@ def post_workout_insight():
             'insight': 'Workout logged!'
         })
     
-    # Get workout history to compare for PRs
-    workouts = []
-    if WORKOUT_LOG.exists():
-        content = WORKOUT_LOG.read_text()
-        if content.strip():
-            workouts.extend(parse_workout_entries(content))
+    # Get workout history for current user only to compare for PRs
+    user_id = get_current_user_id()
+    workouts = get_workouts_from_db(user_id, limit=30) or []
     
     # Build exercise history lookup
     exercise_history = {}
@@ -1241,12 +1883,22 @@ def recovery_check():
     from datetime import datetime, timedelta
     import json
     
-    # Load workouts
+    # Get user-specific workouts from database
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'error': 'Authentication required'}), 401
+    
     workouts = []
-    if WORKOUT_LOG.exists():
-        content = WORKOUT_LOG.read_text()
-        if content.strip():
-            workouts.extend(parse_workout_entries(content))
+    # Try database first - user-specific
+    db_workouts = get_workouts_from_db(user_id, limit=20)
+    if db_workouts:
+        workouts = db_workouts
+    elif not USE_DATABASE:
+        # Fallback to file-based only if no database (legacy mode)
+        if WORKOUT_LOG.exists():
+            content = WORKOUT_LOG.read_text()
+            if content.strip():
+                workouts.extend(parse_workout_entries(content))
     
     # Track muscle group training dates
     muscle_group_last_trained = {}
@@ -1381,7 +2033,7 @@ def recovery_check():
 
 @app.route('/api/update-workout', methods=['POST'])
 def update_workout():
-    """Update an existing workout entry"""
+    """Update an existing workout entry in database or file"""
     data = request.json
     old_date = data.get('old_date')
     old_text = data.get('old_text')
@@ -1390,7 +2042,11 @@ def update_workout():
     if not all([old_date, old_text, new_text]):
         return jsonify({'error': 'Missing required fields'}), 400
     
-    # Read current log
+    # Try database first
+    if update_workout_in_db(old_date, old_text, new_text):
+        return jsonify({'success': True, 'message': 'Workout updated'})
+    
+    # Fall back to file-based
     if not WORKOUT_LOG.exists():
         return jsonify({'error': 'Workout log not found'}), 404
     
@@ -1507,26 +2163,56 @@ def submit_feedback():
     # Add new feedback with timestamp and metadata
     from datetime import datetime
     metadata = data.get('metadata', {})
+    timestamp = datetime.now()
+    
+    feedback_metadata = {
+        # App state
+        'workout_count': metadata.get('workoutCount', 0),
+        'recovery_check_visible': metadata.get('hasRecoveryCheck', False),
+        'analytics_open': metadata.get('analyticsOpen', False),
+        'search_active': metadata.get('searchActive', False),
+        'search_query': metadata.get('searchQuery'),
+        'last_workout_date': metadata.get('lastWorkoutDate'),
+        
+        # Device/Technical
+        'screen_width': metadata.get('screenWidth'),
+        'screen_height': metadata.get('screenHeight'),
+        'device_type': metadata.get('deviceType'),
+        'url': metadata.get('url'),
+    }
+    
+    # Try database first
+    if USE_DATABASE:
+        try:
+            import json as json_lib
+            user_id = get_current_user_id()
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO feedback (text, timestamp, user_agent, metadata, user_id)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """, (feedback_text, timestamp, request.headers.get('User-Agent', ''), json_lib.dumps(feedback_metadata), user_id))
+            return jsonify({
+                'success': True,
+                'message': 'Feedback submitted. Thank you!'
+            })
+        except Exception as e:
+            print(f"Error saving feedback to database: {e}")
+            # Fall through to file-based
+    
+    # File-based fallback
+    feedback_list = []
+    if FEEDBACK_LOG.exists():
+        try:
+            feedback_list = json.loads(FEEDBACK_LOG.read_text())
+        except:
+            feedback_list = []
     
     feedback_entry = {
         'text': feedback_text,
-        'timestamp': datetime.now().isoformat(),
+        'timestamp': timestamp.isoformat(),
         'user_agent': request.headers.get('User-Agent', ''),
-        'metadata': {
-            # App state
-            'workout_count': metadata.get('workoutCount', 0),
-            'recovery_check_visible': metadata.get('hasRecoveryCheck', False),
-            'analytics_open': metadata.get('analyticsOpen', False),
-            'search_active': metadata.get('searchActive', False),
-            'search_query': metadata.get('searchQuery'),
-            'last_workout_date': metadata.get('lastWorkoutDate'),
-            
-            # Device/Technical
-            'screen_width': metadata.get('screenWidth'),
-            'screen_height': metadata.get('screenHeight'),
-            'device_type': metadata.get('deviceType'),
-            'url': metadata.get('url'),
-        }
+        'metadata': feedback_metadata
     }
     
     feedback_list.append(feedback_entry)
@@ -1550,9 +2236,19 @@ def generate_theme():
         return jsonify({'error': 'Workout text required'}), 400
     
     # Check if theme already exists
-    themes = load_themes()
     workout_key = get_workout_key(workout_date, workout_text)
     
+    # Try database first
+    existing_theme = get_theme_from_db(workout_key)
+    if existing_theme:
+        return jsonify({
+            'success': True,
+            'theme': existing_theme,
+            'cached': True
+        })
+    
+    # Fall back to file-based check
+    themes = load_themes()
     if workout_key in themes:
         # Theme already exists, return it
         return jsonify({
@@ -1594,9 +2290,12 @@ Theme:"""
         
         theme = message.content[0].text.strip()
         
-        # Save theme
-        themes[workout_key] = theme
-        save_themes(themes)
+        # Save theme to database or file
+        if not save_theme_to_db(workout_key, theme):
+            # Fall back to file-based
+            themes = load_themes()
+            themes[workout_key] = theme
+            save_themes(themes)
         
         return jsonify({
             'success': True,
@@ -1631,26 +2330,22 @@ def update_theme():
 @app.route('/api/get-last-workout', methods=['GET'])
 def get_last_workout():
     """Get a workout that targets muscle groups that need work (haven't been done recently)"""
+    # Get user-specific workouts - require authentication
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'error': 'Authentication required'}), 401
+    
     workouts = []
-    
-    # Load workouts from all possible locations
-    possible_paths = [
-        Path(__file__).parent / "workout_log.md",
-        KNOWLEDGE_DIR / "workout_log.md",
-        Path(__file__).parent.parent / "Knowledge" / "workout_log.md",
-    ]
-    
-    for workout_log_path in possible_paths:
-        if workout_log_path.exists():
-            content = workout_log_path.read_text()
+    # Get user-specific workouts from database
+    db_workouts = get_workouts_from_db(user_id, limit=50)
+    if db_workouts:
+        workouts = db_workouts
+    elif not USE_DATABASE:
+        # Fallback to file-based only if no database (legacy mode)
+        if WORKOUT_LOG.exists():
+            content = WORKOUT_LOG.read_text()
             if content.strip():
                 workouts.extend(parse_workout_entries(content))
-                break
-    
-    if WORKOUT_LOG.exists():
-        content = WORKOUT_LOG.read_text()
-        if content.strip():
-            workouts.extend(parse_workout_entries(content))
     
     if not workouts:
         return jsonify({
@@ -1726,13 +2421,13 @@ def progressive_overload_suggestions():
             'suggestions': []
         })
     
-    # Get workout history to find last performance for each exercise
-    # Load workouts directly (don't use get_workouts() which returns a Flask response)
-    workouts = []
-    if WORKOUT_LOG.exists():
-        content = WORKOUT_LOG.read_text()
-        if content.strip():
-            workouts.extend(parse_workout_entries(content))
+    # Get user-specific workout history to find last performance for each exercise
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'error': 'Authentication required'}), 401
+    
+    # Get workouts for current user only from database
+    workouts = get_workouts_from_db(user_id, limit=30) or []
     
     # Build exercise history lookup
     exercise_last_done = {}
@@ -2126,26 +2821,12 @@ Do not include any summary, explanation, or extra text. Just the exercises."""
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/get-default-exercise-count', methods=['GET'])
+@require_auth
 def get_default_exercise_count():
     """Calculate default exercise count based on historical average"""
-    workouts = []
-    possible_paths = [
-        Path(__file__).parent / "workout_log.md",
-        KNOWLEDGE_DIR / "workout_log.md",
-        Path(__file__).parent.parent / "Knowledge" / "workout_log.md",
-    ]
-    
-    for workout_log_path in possible_paths:
-        if workout_log_path.exists():
-            content = workout_log_path.read_text()
-            if content.strip():
-                workouts.extend(parse_workout_entries(content))
-                break
-    
-    if WORKOUT_LOG.exists():
-        content = WORKOUT_LOG.read_text()
-        if content.strip():
-            workouts.extend(parse_workout_entries(content))
+    # Load workouts for current user only
+    user_id = get_current_user_id()
+    workouts = get_workouts_from_db(user_id, limit=30) or []
     
     # Calculate average exercises per workout
     from workout_parser import parse_workout_text
@@ -2173,34 +2854,25 @@ def get_default_exercise_count():
 @app.route('/api/suggest-workout', methods=['GET'])
 def suggest_workout():
     """Generate AI-powered workout suggestion based on recent history"""
+    # Get user-specific workouts - require authentication
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'error': 'Authentication required'}), 401
+    
     # Get exercise count from query parameter
     requested_count = request.args.get('count', type=int)
-    # Budget check removed - you can re-enable by uncommenting below
-    # budget = check_budget()
-    # if budget["over_daily_budget"] or budget["over_monthly_budget"]:
-    #     return jsonify({
-    #         'error': 'Budget exceeded. Please check your usage.'
-    #     }), 429
     
-    # Get recent workout history (last 20 workouts)
+    # Get user-specific recent workout history (last 20 workouts)
     workouts = []
-    possible_paths = [
-        Path(__file__).parent / "workout_log.md",
-        KNOWLEDGE_DIR / "workout_log.md",
-        Path(__file__).parent.parent / "Knowledge" / "workout_log.md",
-    ]
-    
-    for workout_log_path in possible_paths:
-        if workout_log_path.exists():
-            content = workout_log_path.read_text()
+    db_workouts = get_workouts_from_db(user_id, limit=20)
+    if db_workouts:
+        workouts = db_workouts
+    elif not USE_DATABASE:
+        # Fallback to file-based only if no database (legacy mode)
+        if WORKOUT_LOG.exists():
+            content = WORKOUT_LOG.read_text()
             if content.strip():
                 workouts.extend(parse_workout_entries(content))
-                break
-    
-    if WORKOUT_LOG.exists():
-        content = WORKOUT_LOG.read_text()
-        if content.strip():
-            workouts.extend(parse_workout_entries(content))
     
     # Get last 20 workouts for analysis
     recent_workouts = workouts[:20]
@@ -2693,7 +3365,7 @@ Guidelines:
 
 @app.route('/api/delete-workout', methods=['POST'])
 def delete_workout():
-    """Delete a workout entry"""
+    """Delete a workout entry from database or file"""
     data = request.json
     workout_date = data.get('workout_date', '')
     workout_text = data.get('workout_text', '')
@@ -2701,6 +3373,11 @@ def delete_workout():
     if not all([workout_date, workout_text]):
         return jsonify({'error': 'Missing required fields'}), 400
     
+    # Try database first
+    if delete_workout_from_db(workout_date, workout_text):
+        return jsonify({'success': True, 'message': 'Workout deleted'})
+    
+    # Fall back to file-based
     deleted = False
     
     # Try to delete from workouts.md
@@ -2940,18 +3617,16 @@ Keep it concise and encouraging (under 300 words)."""
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/analytics', methods=['GET'])
+@require_auth
 def get_analytics():
     """Get comprehensive analytics: strength trends, consistency, plateaus, muscle group balance"""
     from workout_parser import parse_workout_text, extract_muscle_groups_from_exercises
     from datetime import datetime, timedelta
     from collections import defaultdict
     
-    # Load workouts
-    workouts = []
-    if WORKOUT_LOG.exists():
-        content = WORKOUT_LOG.read_text()
-        if content.strip():
-            workouts.extend(parse_workout_entries(content))
+    # Load workouts for current user only
+    user_id = get_current_user_id()
+    workouts = get_workouts_from_db(user_id, limit=60) or []
     
     if not workouts:
         return jsonify({
@@ -3308,6 +3983,11 @@ def generate_neglected_workout():
     from datetime import datetime
     import json
     
+    # Get user-specific workouts - require authentication
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'error': 'Authentication required'}), 401
+    
     # Load exercise mapping
     try:
         exercise_mapping = load_exercise_mapping()
@@ -3317,12 +3997,8 @@ def generate_neglected_workout():
             'error': f'Error loading exercise mapping: {str(e)}'
         }), 500
     
-    # Get neglected groups from recovery check
-    workouts = []
-    if WORKOUT_LOG.exists():
-        content = WORKOUT_LOG.read_text()
-        if content.strip():
-            workouts.extend(parse_workout_entries(content))
+    # Get workouts for current user only from database
+    workouts = get_workouts_from_db(user_id, limit=30) or []
     
     # Track muscle group training dates (same logic as recovery check)
     muscle_group_last_trained = {}
@@ -3633,6 +4309,7 @@ def generate_neglected_workout():
     })
 
 @app.route('/api/search-workouts', methods=['POST'])
+@require_auth
 def search_workouts():
     """Search workouts - uses cached index for presets, AI for free-form"""
     data = request.json
@@ -3658,11 +4335,9 @@ def search_workouts():
             })
     
     # For free-form queries, use AI search (original implementation)
-    workouts = []
-    if WORKOUT_LOG.exists():
-        content = WORKOUT_LOG.read_text()
-        if content.strip():
-            workouts.extend(parse_workout_entries(content))
+    # Load workouts for current user only
+    user_id = get_current_user_id()
+    workouts = get_workouts_from_db(user_id) or []
     
     if not workouts:
         return jsonify({

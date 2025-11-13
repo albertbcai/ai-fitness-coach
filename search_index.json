@@ -22,7 +22,6 @@
     85
   ],
   "full body": [
-    0,
     1,
     2,
     3,
@@ -95,8 +94,8 @@
     31
   ],
   "_metadata": {
-    "workout_hash": "80090bfe626349ee2a0497d40bb0970b",
+    "workout_hash": "d035d9b3cecc6998ebd22b66f5fbafbe",
     "workout_count": 131,
-    "last_updated": "2025-11-13T01:03:47.418350"
+    "last_updated": "2025-11-13T02:07:05.287236"
   }
 }
