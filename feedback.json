@@ -38,5 +38,27 @@
     "timestamp": "2025-11-13T01:59:15.874Z",
     "suggestion": "[Varied upper/lower split workout]\n\ndumbbell bench - 90 * 6\nincline dumbbell - 65 * 8 \ntricep pulldown - 65 * 7\nshoulder press barbell - 95 * 4\nlat pulldown - 145 * 10\nsit-up - 20 * 12",
     "feedback": "We shouldn\u2019t have brackets in the of the up we shouldn\u2019t have brackets in the upper lower split that you\u2019re showing that\u2019s not right"
+  },
+  {
+    "text": "testing testing does this feedback show up anywhere?",
+    "timestamp": "2025-11-13T01:23:52.546666",
+    "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0.1 Mobile/15E148 Safari/604.1"
+  },
+  {
+    "text": "dope OK what\u2019s the current state of this app? Is the feedback working?",
+    "timestamp": "2025-11-13T01:25:37.665293",
+    "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0.1 Mobile/15E148 Safari/604.1",
+    "metadata": {
+      "workout_count": 100,
+      "recovery_check_visible": true,
+      "analytics_open": false,
+      "search_active": false,
+      "search_query": null,
+      "last_workout_date": "11/11/25",
+      "screen_width": 393,
+      "screen_height": 695,
+      "device_type": "mobile",
+      "url": "http://172.20.10.4:5001/"
+    }
   }
 ]

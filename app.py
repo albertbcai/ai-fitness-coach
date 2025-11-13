@@ -1504,12 +1504,29 @@ def submit_feedback():
         except:
             feedback_list = []
     
-    # Add new feedback with timestamp
+    # Add new feedback with timestamp and metadata
     from datetime import datetime
+    metadata = data.get('metadata', {})
+    
     feedback_entry = {
         'text': feedback_text,
         'timestamp': datetime.now().isoformat(),
         'user_agent': request.headers.get('User-Agent', ''),
+        'metadata': {
+            # App state
+            'workout_count': metadata.get('workoutCount', 0),
+            'recovery_check_visible': metadata.get('hasRecoveryCheck', False),
+            'analytics_open': metadata.get('analyticsOpen', False),
+            'search_active': metadata.get('searchActive', False),
+            'search_query': metadata.get('searchQuery'),
+            'last_workout_date': metadata.get('lastWorkoutDate'),
+            
+            # Device/Technical
+            'screen_width': metadata.get('screenWidth'),
+            'screen_height': metadata.get('screenHeight'),
+            'device_type': metadata.get('deviceType'),
+            'url': metadata.get('url'),
+        }
     }
     
     feedback_list.append(feedback_entry)
@@ -3961,7 +3978,7 @@ def get_usage():
     })
 
 @app.route('/api/submit-feedback', methods=['POST'])
-def submit_feedback():
+def submit_suggestion_feedback():
     """Receive feedback on suggestions for debugging/improvement"""
     data = request.json
     suggestion = data.get('suggestion', '')

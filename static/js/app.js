@@ -829,13 +829,39 @@ feedbackSubmitBtn.addEventListener('click', async () => {
         return;
     }
     
+    // Collect metadata about current app state
+    const metadata = {
+        // App state
+        workoutCount: workouts.length,
+        hasRecoveryCheck: document.getElementById('recovery-check').style.display !== 'none',
+        analyticsOpen: document.getElementById('analytics-section').style.display !== 'none',
+        searchActive: workoutSearchInput.value.trim().length > 0,
+        searchQuery: workoutSearchInput.value.trim() || null,
+        
+        // Device/Technical
+        screenWidth: window.innerWidth,
+        screenHeight: window.innerHeight,
+        deviceType: window.innerWidth < 768 ? 'mobile' : 'desktop',
+        userAgent: navigator.userAgent,
+        
+        // Page context
+        url: window.location.href,
+        timestamp: new Date().toISOString(),
+        
+        // Optional: last workout date if available
+        lastWorkoutDate: workouts.length > 0 ? workouts[0].date : null
+    };
+    
     try {
         const response = await fetch('/api/feedback', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ feedback: text })
+            body: JSON.stringify({ 
+                feedback: text,
+                metadata: metadata
+            })
         });
         
         const data = await response.json();
