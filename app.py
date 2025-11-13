@@ -1526,6 +1526,91 @@ def export_workouts():
     )
     return response
 
+@app.route('/api/import-workouts', methods=['POST'])
+@require_auth
+def import_workouts():
+    """Import workouts from a markdown file"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'error': 'Authentication required'}), 401
+    
+    if not USE_DATABASE:
+        return jsonify({'error': 'Database not available'}), 500
+    
+    # Check if file was uploaded
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+    
+    file = request.files['file']
+    
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    
+    # Check file extension
+    if not file.filename.lower().endswith('.md'):
+        return jsonify({'error': 'File must be a markdown file (.md)'}), 400
+    
+    try:
+        # Read file content
+        content = file.read().decode('utf-8')
+        
+        # Parse workout entries from markdown
+        entries = parse_workout_entries(content)
+        
+        if not entries:
+            return jsonify({'error': 'No workout entries found in file'}), 400
+        
+        # Get existing workouts once to check for duplicates
+        existing_workouts = get_workouts_from_db(user_id) or []
+        existing_keys = set()
+        for workout in existing_workouts:
+            date = workout.get('date', '')
+            text = workout.get('text', '')
+            if date and text:
+                existing_keys.add((date, text))
+        
+        # Import workouts to database
+        imported_count = 0
+        skipped_count = 0
+        errors = []
+        
+        for entry in entries:
+            date = entry.get('date', '')
+            text = entry.get('text', '')
+            
+            if not date or not text:
+                skipped_count += 1
+                continue
+            
+            # Check if workout already exists (same date and text for this user)
+            if (date, text) in existing_keys:
+                skipped_count += 1
+                continue
+            
+            # Add workout to database
+            workout_id = add_workout_to_db(date, text, user_id)
+            if workout_id:
+                imported_count += 1
+                # Add to existing_keys to avoid duplicates within the same import
+                existing_keys.add((date, text))
+            else:
+                errors.append(f"Failed to import workout: {date}")
+        
+        return jsonify({
+            'success': True,
+            'imported': imported_count,
+            'skipped': skipped_count,
+            'errors': errors if errors else None
+        }), 200
+        
+    except UnicodeDecodeError:
+        return jsonify({'error': 'File encoding error. Please ensure the file is UTF-8 encoded.'}), 400
+    except Exception as e:
+        print(f"Error importing workouts: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Error importing workouts: {str(e)}'}), 500
+
 @app.route('/api/workouts', methods=['GET'])
 def get_workouts():
     """Get all workout entries from database or file"""

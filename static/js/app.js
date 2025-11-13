@@ -541,6 +541,60 @@ async function searchWorkouts(query) {
     }
 }
 
+// Import workouts from markdown file
+const importWorkoutsBtn = document.getElementById('import-workouts-btn');
+const importWorkoutsInput = document.getElementById('import-workouts-input');
+
+importWorkoutsBtn.addEventListener('click', () => {
+    importWorkoutsInput.click();
+});
+
+importWorkoutsInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    // Check file extension
+    if (!file.name.toLowerCase().endsWith('.md')) {
+        alert('Please select a markdown file (.md)');
+        importWorkoutsInput.value = '';
+        return;
+    }
+    
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const response = await fetch('/api/import-workouts', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            let message = `Successfully imported ${data.imported} workout(s).`;
+            if (data.skipped > 0) {
+                message += ` ${data.skipped} duplicate(s) skipped.`;
+            }
+            if (data.errors && data.errors.length > 0) {
+                message += ` ${data.errors.length} error(s) occurred.`;
+            }
+            alert(message);
+            
+            // Reload workouts to show imported ones
+            await loadWorkouts();
+        } else {
+            alert(data.error || 'Failed to import workouts');
+        }
+    } catch (error) {
+        console.error('Error importing workouts:', error);
+        alert('Error importing workouts. Please try again.');
+    } finally {
+        // Reset file input
+        importWorkoutsInput.value = '';
+    }
+});
+
 // Export workouts as markdown
 exportWorkoutsBtn.addEventListener('click', async () => {
     try {
