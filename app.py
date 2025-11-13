@@ -1569,11 +1569,15 @@ def import_workouts():
             if date and text:
                 existing_keys.add((date, text))
         
-        # Import workouts to database
+        # Import workouts to database in reverse order
+        # This ensures that when ordered by created_at DESC, they appear in the same order as the markdown file
+        # (first entry in markdown = imported last = newest created_at = appears first)
         imported_count = 0
         skipped_count = 0
         errors = []
         
+        # Collect entries to import (in original order)
+        entries_to_import = []
         for entry in entries:
             date = entry.get('date', '')
             text = entry.get('text', '')
@@ -1587,12 +1591,17 @@ def import_workouts():
                 skipped_count += 1
                 continue
             
-            # Add workout to database
+            entries_to_import.append((date, text))
+            # Add to existing_keys to avoid duplicates within the same import
+            existing_keys.add((date, text))
+        
+        # Import in reverse order (so markdown order is preserved when displayed)
+        # First entry in markdown gets imported last, so it has the newest created_at
+        # When ordered by created_at DESC, it appears first (preserving markdown order)
+        for date, text in reversed(entries_to_import):
             workout_id = add_workout_to_db(date, text, user_id)
             if workout_id:
                 imported_count += 1
-                # Add to existing_keys to avoid duplicates within the same import
-                existing_keys.add((date, text))
             else:
                 errors.append(f"Failed to import workout: {date}")
         
@@ -1610,6 +1619,80 @@ def import_workouts():
         import traceback
         traceback.print_exc()
         return jsonify({'error': f'Error importing workouts: {str(e)}'}), 500
+
+@app.route('/api/delete-all-data', methods=['POST'])
+@require_auth
+def delete_all_data():
+    """Delete all data for the current user"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'error': 'Authentication required'}), 401
+    
+    if not USE_DATABASE:
+        return jsonify({'error': 'Database not available'}), 500
+    
+    try:
+        user_id = int(user_id)
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid user ID'}), 400
+    
+    try:
+        db_url = get_db_url()
+        use_sqlite = is_sqlite(db_url)
+        with get_db_connection() as conn:
+            cur = get_cursor(conn)
+            
+            deleted_counts = {}
+            
+            # Delete workouts
+            if use_sqlite:
+                cur.execute("DELETE FROM workouts WHERE user_id = ?", (user_id,))
+            else:
+                cur.execute("DELETE FROM workouts WHERE user_id = %s", (user_id,))
+            deleted_counts['workouts'] = cur.rowcount
+            
+            # Delete themes
+            if use_sqlite:
+                cur.execute("DELETE FROM themes WHERE user_id = ?", (user_id,))
+            else:
+                cur.execute("DELETE FROM themes WHERE user_id = %s", (user_id,))
+            deleted_counts['themes'] = cur.rowcount
+            
+            # Delete usage data
+            if use_sqlite:
+                cur.execute("DELETE FROM usage WHERE user_id = ?", (user_id,))
+            else:
+                cur.execute("DELETE FROM usage WHERE user_id = %s", (user_id,))
+            deleted_counts['usage'] = cur.rowcount
+            
+            # Delete feedback
+            if use_sqlite:
+                cur.execute("DELETE FROM feedback WHERE user_id = ?", (user_id,))
+            else:
+                cur.execute("DELETE FROM feedback WHERE user_id = %s", (user_id,))
+            deleted_counts['feedback'] = cur.rowcount
+            
+            conn.commit()
+            
+            # Clear search index (it's user-specific based on workouts)
+            try:
+                search_index_path = BASE_DIR / "search_index.json"
+                if search_index_path.exists():
+                    search_index_path.unlink()
+            except Exception as e:
+                print(f"Error deleting search index: {e}")
+            
+            return jsonify({
+                'success': True,
+                'message': 'All data deleted successfully',
+                'deleted': deleted_counts
+            }), 200
+            
+    except Exception as e:
+        print(f"Error deleting all data: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Error deleting data: {str(e)}'}), 500
 
 @app.route('/api/workouts', methods=['GET'])
 def get_workouts():

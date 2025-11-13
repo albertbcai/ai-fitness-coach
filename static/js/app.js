@@ -619,6 +619,43 @@ exportWorkoutsBtn.addEventListener('click', async () => {
     }
 });
 
+// Delete all data
+const deleteAllDataBtn = document.getElementById('delete-all-data-btn');
+deleteAllDataBtn.addEventListener('click', async () => {
+    const confirmed = confirm('Are you sure you want to delete ALL your data? This includes:\n\n- All workouts\n- All themes\n- All usage data\n- All feedback\n\nThis action cannot be undone!');
+    
+    if (!confirmed) {
+        return;
+    }
+    
+    // Double confirmation
+    const doubleConfirmed = confirm('This will permanently delete ALL your data. Are you absolutely sure?');
+    if (!doubleConfirmed) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/delete-all-data', {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            alert('All data deleted successfully. The page will reload.');
+            // Reload workouts (will be empty now)
+            await loadWorkouts();
+            // Reload page to reset state
+            window.location.reload();
+        } else {
+            alert(data.error || 'Failed to delete data');
+        }
+    } catch (error) {
+        console.error('Error deleting all data:', error);
+        alert('Error deleting data. Please try again.');
+    }
+});
+
 // Show/hide clear button based on input
 function updateClearButton() {
     if (workoutSearchInput.value.trim().length > 0) {
