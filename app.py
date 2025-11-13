@@ -21,8 +21,13 @@ from functools import wraps
 load_dotenv()
 
 app = Flask(__name__)
+# Detect production environment (Railway sets DATABASE_URL, or we check for Railway env vars)
+# Also check if SECRET_KEY is explicitly set (indicates production setup)
+is_production_env = (
+    os.getenv('DATABASE_URL') is not None and 'postgres' in os.getenv('DATABASE_URL', '').lower()
+) or os.getenv('RAILWAY_ENVIRONMENT') is not None or os.getenv('RAILWAY') is not None or os.getenv('SECRET_KEY') is not None
+
 # Trust Railway's proxy headers for HTTPS detection
-is_production_env = os.getenv('RAILWAY_ENVIRONMENT') is not None or os.getenv('RAILWAY') is not None
 if is_production_env:
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1)
 # Set a secret key for sessions (use environment variable or generate one)
