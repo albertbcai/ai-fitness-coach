@@ -40,13 +40,14 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)  # Sessions last 
 is_production = is_production_env or os.getenv('FLASK_ENV') == 'production'
 app.config['SESSION_COOKIE_SECURE'] = is_production
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-# Use Lax for same-site cookie policy (works with Railway's proxy)
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-# For Railway, ensure cookies work behind proxy
+# For Railway behind proxy, use None with Secure for proper cookie handling
+# Railway's proxy may require None for cross-origin cookie handling
 if is_production:
+    app.config['SESSION_COOKIE_SAMESITE'] = 'None'  # Required for Railway proxy
     app.config['SESSION_COOKIE_DOMAIN'] = None  # Let Railway handle domain
-    # Ensure cookie path is root
-    app.config['SESSION_COOKIE_PATH'] = '/'
+    app.config['SESSION_COOKIE_PATH'] = '/'  # Ensure cookie path is root
+else:
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Lax for local development
 
 # Initialize database on startup
 try:
