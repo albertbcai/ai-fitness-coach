@@ -21,9 +21,14 @@ load_dotenv()
 
 app = Flask(__name__)
 # Set a secret key for sessions (use environment variable or generate one)
+# IMPORTANT: Set SECRET_KEY in Railway environment variables for session persistence
 app.secret_key = os.getenv('SECRET_KEY', secrets.token_hex(32))
 # Make sessions permanent (persist until logout)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)  # Sessions last 1 year
+# Configure session cookies for production
+app.config['SESSION_COOKIE_SECURE'] = os.getenv('FLASK_ENV') == 'production' or os.getenv('RAILWAY_ENVIRONMENT') is not None
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # Initialize database on startup
 try:
@@ -372,13 +377,21 @@ def get_theme_from_db(workout_key, user_id=None):
         return None
     
     try:
+        user_id = int(user_id)
+    except (ValueError, TypeError):
+        return None
+    
+    try:
+        db_url = get_db_url()
+        use_sqlite = is_sqlite(db_url)
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT theme FROM themes WHERE workout_key = %s AND user_id = %s
-                """, (workout_key, user_id))
-                result = cur.fetchone()
-                return result[0] if result else None
+            cur = get_cursor(conn)
+            if use_sqlite:
+                cur.execute("SELECT theme FROM themes WHERE workout_key = ? AND user_id = ?", (workout_key, user_id))
+            else:
+                cur.execute("SELECT theme FROM themes WHERE workout_key = %s AND user_id = %s", (workout_key, user_id))
+            result = cur.fetchone()
+            return result[0] if result else None
     except Exception as e:
         print(f"Error getting theme from database: {e}")
         return None
@@ -395,17 +408,33 @@ def save_theme_to_db(workout_key, theme, user_id=None):
         return False
     
     try:
+        user_id = int(user_id)
+    except (ValueError, TypeError):
+        return False
+    
+    try:
+        db_url = get_db_url()
+        use_sqlite = is_sqlite(db_url)
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            cur = get_cursor(conn)
+            if use_sqlite:
+                # SQLite uses INSERT OR REPLACE or check if exists first
+                cur.execute("""
+                    INSERT OR REPLACE INTO themes (workout_key, theme, user_id, updated_at) 
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                """, (workout_key, theme, user_id))
+            else:
                 cur.execute("""
                     INSERT INTO themes (workout_key, theme, user_id) 
                     VALUES (%s, %s, %s)
                     ON CONFLICT (workout_key, user_id) 
                     DO UPDATE SET theme = %s, updated_at = CURRENT_TIMESTAMP
                 """, (workout_key, theme, user_id, theme))
-                return True
+            return True
     except Exception as e:
         print(f"Error saving theme to database: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def load_usage(user_id=None):
@@ -420,49 +449,87 @@ def load_usage(user_id=None):
     
     if USE_DATABASE:
         try:
+            db_url = get_db_url()
+            use_sqlite = is_sqlite(db_url)
             with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    # Get daily usage
+                cur = get_cursor(conn)
+                # Get daily usage
+                if user_id:
+                    try:
+                        user_id = int(user_id)
+                    except (ValueError, TypeError):
+                        user_id = None
+                    
                     if user_id:
+                        if use_sqlite:
+                            cur.execute("""
+                                SELECT date, input_tokens, output_tokens, cost, requests
+                                FROM usage
+                                WHERE user_id = ?
+                                ORDER BY date DESC
+                            """, (user_id,))
+                        else:
+                            cur.execute("""
+                                SELECT date, input_tokens, output_tokens, cost, requests
+                                FROM usage
+                                WHERE user_id = %s
+                                ORDER BY date DESC
+                            """, (user_id,))
+                    else:
+                        if use_sqlite:
+                            cur.execute("""
+                                SELECT date, input_tokens, output_tokens, cost, requests
+                                FROM usage
+                                ORDER BY date DESC
+                            """)
+                        else:
+                            cur.execute("""
+                                SELECT date, input_tokens, output_tokens, cost, requests
+                                FROM usage
+                                ORDER BY date DESC
+                            """)
+                else:
+                    if use_sqlite:
                         cur.execute("""
                             SELECT date, input_tokens, output_tokens, cost, requests
                             FROM usage
-                            WHERE user_id = %s
                             ORDER BY date DESC
-                        """, (user_id,))
+                        """)
                     else:
                         cur.execute("""
                             SELECT date, input_tokens, output_tokens, cost, requests
                             FROM usage
                             ORDER BY date DESC
                         """)
-                    daily = {}
-                    total_input = 0
-                    total_output = 0
-                    total_cost = 0.0
-                    
-                    for row in cur.fetchall():
-                        date_str = row[0].strftime("%Y-%m-%d")
-                        daily[date_str] = {
-                            "input_tokens": row[1],
-                            "output_tokens": row[2],
-                            "cost": float(row[3]),
-                            "requests": row[4]
-                        }
-                        total_input += row[1]
-                        total_output += row[2]
-                        total_cost += float(row[3])
-                    
-                    return {
-                        "daily": daily,
-                        "total": {
-                            "input_tokens": total_input,
-                            "output_tokens": total_output,
-                            "cost": total_cost
-                        }
+                daily = {}
+                total_input = 0
+                total_output = 0
+                total_cost = 0.0
+                
+                for row in cur.fetchall():
+                    date_str = row[0].strftime("%Y-%m-%d") if hasattr(row[0], 'strftime') else str(row[0])
+                    daily[date_str] = {
+                        "input_tokens": row[1],
+                        "output_tokens": row[2],
+                        "cost": float(row[3]),
+                        "requests": row[4]
                     }
+                    total_input += row[1]
+                    total_output += row[2]
+                    total_cost += float(row[3])
+                
+                return {
+                    "daily": daily,
+                    "total": {
+                        "input_tokens": total_input,
+                        "output_tokens": total_output,
+                        "cost": total_cost
+                    }
+                }
         except Exception as e:
             print(f"Error loading usage from database: {e}")
+            import traceback
+            traceback.print_exc()
             # Fall through to file-based
     
     # File-based fallback
@@ -1122,18 +1189,38 @@ def save_themes(themes):
     """Save themes to database or file"""
     if USE_DATABASE:
         try:
+            user_id = get_current_user_id()
+            if not user_id:
+                # Can't save without user_id
+                return
+            
+            try:
+                user_id = int(user_id)
+            except (ValueError, TypeError):
+                return
+            
+            db_url = get_db_url()
+            use_sqlite = is_sqlite(db_url)
             with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    for workout_key, theme in themes.items():
+                cur = get_cursor(conn)
+                for workout_key, theme in themes.items():
+                    if use_sqlite:
                         cur.execute("""
-                            INSERT INTO themes (workout_key, theme) 
-                            VALUES (%s, %s)
-                            ON CONFLICT (workout_key) 
+                            INSERT OR REPLACE INTO themes (workout_key, theme, user_id, updated_at) 
+                            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                        """, (workout_key, theme, user_id))
+                    else:
+                        cur.execute("""
+                            INSERT INTO themes (workout_key, theme, user_id) 
+                            VALUES (%s, %s, %s)
+                            ON CONFLICT (workout_key, user_id) 
                             DO UPDATE SET theme = %s, updated_at = CURRENT_TIMESTAMP
-                        """, (workout_key, theme, theme))
+                        """, (workout_key, theme, user_id, theme))
             return
         except Exception as e:
             print(f"Error saving themes to database: {e}")
+            import traceback
+            traceback.print_exc()
             # Fall through to file-based
     
     # File-based fallback
@@ -1165,22 +1252,56 @@ def update_usage(input_tokens, output_tokens, user_id=None):
     
     if USE_DATABASE and user_id:
         try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        INSERT INTO usage (date, input_tokens, output_tokens, cost, requests, user_id)
-                        VALUES (%s, %s, %s, %s, 1, %s)
-                        ON CONFLICT (user_id, date) 
-                        DO UPDATE SET 
-                            input_tokens = usage.input_tokens + %s,
-                            output_tokens = usage.output_tokens + %s,
-                            cost = usage.cost + %s,
-                            requests = usage.requests + 1,
-                            updated_at = CURRENT_TIMESTAMP
-                    """, (today, input_tokens, output_tokens, cost, user_id, input_tokens, output_tokens, cost))
-            return
+            try:
+                user_id = int(user_id)
+            except (ValueError, TypeError):
+                # Fall through to file-based
+                pass
+            else:
+                db_url = get_db_url()
+                use_sqlite = is_sqlite(db_url)
+                with get_db_connection() as conn:
+                    cur = get_cursor(conn)
+                    if use_sqlite:
+                        # SQLite: Check if exists, then update or insert
+                        cur.execute("""
+                            SELECT input_tokens, output_tokens, cost, requests
+                            FROM usage
+                            WHERE user_id = ? AND date = ?
+                        """, (user_id, today))
+                        existing = cur.fetchone()
+                        if existing:
+                            cur.execute("""
+                                UPDATE usage
+                                SET input_tokens = input_tokens + ?,
+                                    output_tokens = output_tokens + ?,
+                                    cost = cost + ?,
+                                    requests = requests + 1,
+                                    updated_at = CURRENT_TIMESTAMP
+                                WHERE user_id = ? AND date = ?
+                            """, (input_tokens, output_tokens, cost, user_id, today))
+                        else:
+                            cur.execute("""
+                                INSERT INTO usage (date, input_tokens, output_tokens, cost, requests, user_id)
+                                VALUES (?, ?, ?, ?, 1, ?)
+                            """, (today, input_tokens, output_tokens, cost, user_id))
+                    else:
+                        cur.execute("""
+                            INSERT INTO usage (date, input_tokens, output_tokens, cost, requests, user_id)
+                            VALUES (%s, %s, %s, %s, 1, %s)
+                            ON CONFLICT (user_id, date) 
+                            DO UPDATE SET 
+                                input_tokens = usage.input_tokens + %s,
+                                output_tokens = usage.output_tokens + %s,
+                                cost = usage.cost + %s,
+                                requests = usage.requests + 1,
+                                updated_at = CURRENT_TIMESTAMP
+                        """, (today, input_tokens, output_tokens, cost, user_id, input_tokens, output_tokens, cost))
+                return
         except Exception as e:
             print(f"Error updating usage in database: {e}")
+            import traceback
+            traceback.print_exc()
             # Fall through to file-based
     
     # File-based fallback
@@ -2186,18 +2307,35 @@ def submit_feedback():
         try:
             import json as json_lib
             user_id = get_current_user_id()
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        INSERT INTO feedback (text, timestamp, user_agent, metadata, user_id)
-                        VALUES (%s, %s, %s, %s, %s)
-                    """, (feedback_text, timestamp, request.headers.get('User-Agent', ''), json_lib.dumps(feedback_metadata), user_id))
-            return jsonify({
-                'success': True,
-                'message': 'Feedback submitted. Thank you!'
-            })
+            if user_id:
+                try:
+                    user_id = int(user_id)
+                except (ValueError, TypeError):
+                    user_id = None
+            
+            if user_id:
+                db_url = get_db_url()
+                use_sqlite = is_sqlite(db_url)
+                with get_db_connection() as conn:
+                    cur = get_cursor(conn)
+                    if use_sqlite:
+                        cur.execute("""
+                            INSERT INTO feedback (text, timestamp, user_agent, metadata, user_id)
+                            VALUES (?, ?, ?, ?, ?)
+                        """, (feedback_text, timestamp, request.headers.get('User-Agent', ''), json_lib.dumps(feedback_metadata), user_id))
+                    else:
+                        cur.execute("""
+                            INSERT INTO feedback (text, timestamp, user_agent, metadata, user_id)
+                            VALUES (%s, %s, %s, %s, %s)
+                        """, (feedback_text, timestamp, request.headers.get('User-Agent', ''), json_lib.dumps(feedback_metadata), user_id))
+                return jsonify({
+                    'success': True,
+                    'message': 'Feedback submitted. Thank you!'
+                })
         except Exception as e:
             print(f"Error saving feedback to database: {e}")
+            import traceback
+            traceback.print_exc()
             # Fall through to file-based
     
     # File-based fallback
