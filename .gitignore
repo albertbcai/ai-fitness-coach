@@ -35,3 +35,19 @@ app.log
 # usage.json
 # feedback.json
 # search_index.json
+
+# Local SQLite database
+fitness_coach.db
+*.db
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment variables
+.env
+
+# Logs
+*.log
+app.log
