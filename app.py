@@ -11,6 +11,7 @@ import secrets
 from pathlib import Path
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify, session
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import generate_password_hash, check_password_hash
 from anthropic import Anthropic
 from dotenv import load_dotenv
@@ -20,15 +21,24 @@ from functools import wraps
 load_dotenv()
 
 app = Flask(__name__)
+# Trust Railway's proxy headers for HTTPS detection
+is_production_env = os.getenv('RAILWAY_ENVIRONMENT') is not None or os.getenv('RAILWAY') is not None
+if is_production_env:
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1)
 # Set a secret key for sessions (use environment variable or generate one)
 # IMPORTANT: Set SECRET_KEY in Railway environment variables for session persistence
 app.secret_key = os.getenv('SECRET_KEY', secrets.token_hex(32))
 # Make sessions permanent (persist until logout)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)  # Sessions last 1 year
 # Configure session cookies for production
-app.config['SESSION_COOKIE_SECURE'] = os.getenv('FLASK_ENV') == 'production' or os.getenv('RAILWAY_ENVIRONMENT') is not None
+# Railway uses HTTPS, so set secure cookies when not in local development
+is_production = is_production_env or os.getenv('FLASK_ENV') == 'production'
+app.config['SESSION_COOKIE_SECURE'] = is_production
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+# For Railway, ensure cookies work behind proxy
+if is_production:
+    app.config['SESSION_COOKIE_DOMAIN'] = None  # Let Railway handle domain
 
 # Initialize database on startup
 try:
