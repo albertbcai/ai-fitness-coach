@@ -24,6 +24,9 @@ const workoutSearchInput = document.getElementById('workout-search');
 const searchClearBtn = document.getElementById('search-clear-btn');
 const exportWorkoutsBtn = document.getElementById('export-workouts-btn');
 const feedbackBtn = document.getElementById('feedback-btn');
+const hamburgerMenuBtn = document.getElementById('hamburger-menu-btn');
+const hamburgerMenu = document.getElementById('hamburger-menu');
+const deleteSampleWorkoutsBtn = document.getElementById('delete-sample-workouts-btn');
 const feedbackModal = document.getElementById('feedback-modal');
 const feedbackModalClose = document.getElementById('feedback-modal-close');
 const feedbackCancelBtn = document.getElementById('feedback-cancel-btn');
@@ -490,12 +493,87 @@ async function loadWorkouts() {
         if (data.success) {
             workouts = data.workouts;
             filteredWorkouts = []; // Reset filtered workouts
+            
+            // If user has 0 workouts, create sample workouts
+            if (workouts.length === 0) {
+                try {
+                    const sampleResponse = await fetch('/api/create-sample-workouts', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    if (sampleResponse.ok) {
+                        const sampleData = await sampleResponse.json();
+                        if (sampleData.success && sampleData.created > 0) {
+                            // Reload workouts after creating samples
+                            const reloadResponse = await fetch('/api/workouts');
+                            const reloadData = await reloadResponse.json();
+                            if (reloadData.success) {
+                                workouts = reloadData.workouts;
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error creating sample workouts:', error);
+                }
+            }
+            
             renderWorkouts();
+            
+            // Update delete sample workouts button visibility
+            updateDeleteSampleWorkoutsButton();
         }
     } catch (error) {
         console.error('Error loading workouts:', error);
     }
 }
+
+// Show/hide "Delete Sample Workouts" button based on whether sample workouts exist
+function updateDeleteSampleWorkoutsButton() {
+    if (!deleteSampleWorkoutsBtn) return;
+    
+    // Check if there are any sample workouts
+    const hasSampleWorkouts = workouts.some(workout => {
+        const text = workout.text || workout.feedback || '';
+        return text.includes('[SAMPLE]');
+    });
+    
+    // Show button if sample workouts exist
+    deleteSampleWorkoutsBtn.style.display = hasSampleWorkouts ? 'block' : 'none';
+}
+
+// Delete sample workouts
+deleteSampleWorkoutsBtn?.addEventListener('click', async () => {
+    const confirmed = confirm('Are you sure you want to delete all sample workouts?');
+    
+    if (!confirmed) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/delete-sample-workouts', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            // Reload workouts to reflect changes
+            await loadWorkouts();
+            alert(`Deleted ${data.deleted || 0} sample workouts.`);
+        } else {
+            alert(data.error || 'Failed to delete sample workouts');
+        }
+    } catch (error) {
+        console.error('Error deleting sample workouts:', error);
+        alert('Error deleting sample workouts. Please try again.');
+    }
+});
 
 let filteredWorkouts = []; // Store filtered workouts for search
 let searchTimeout = null;
@@ -583,6 +661,7 @@ importWorkoutsInput.addEventListener('change', async (e) => {
             
             // Reload workouts to show imported ones
             await loadWorkouts();
+            updateDeleteSampleWorkoutsButton();
         } else {
             alert(data.error || 'Failed to import workouts');
         }
@@ -1015,6 +1094,7 @@ async function deleteWorkout(workoutDate, workoutText, entryElement) {
             // Reload from server to ensure we're in sync (in case workout was in multiple files)
             setTimeout(async () => {
                 await loadWorkouts();
+                updateDeleteSampleWorkoutsButton();
             }, 100);
         } else {
             alert('Error: ' + (data.error || 'Failed to delete workout'));
@@ -1051,6 +1131,7 @@ async function addWorkout() {
             // Small delay to ensure file is written, then reload
             setTimeout(async () => {
                 await loadWorkouts();
+                updateDeleteSampleWorkoutsButton();
                 // Wait a bit for the insight banner to appear, then scroll to it
                 setTimeout(() => {
                     // Scroll to the post-workout insight banner if it's visible
@@ -1087,6 +1168,31 @@ async function addWorkout() {
 }
 
 // Feedback functionality
+// Hamburger Menu Toggle
+hamburgerMenuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = hamburgerMenu.style.display === 'flex';
+    hamburgerMenu.style.display = isOpen ? 'none' : 'flex';
+    hamburgerMenuBtn.classList.toggle('active', !isOpen);
+});
+
+// Close menu when clicking outside
+document.addEventListener('click', (e) => {
+    if (!hamburgerMenu.contains(e.target) && e.target !== hamburgerMenuBtn) {
+        hamburgerMenu.style.display = 'none';
+        hamburgerMenuBtn.classList.remove('active');
+    }
+});
+
+// Close menu when clicking on menu items
+const menuItems = hamburgerMenu.querySelectorAll('.menu-item');
+menuItems.forEach(item => {
+    item.addEventListener('click', () => {
+        hamburgerMenu.style.display = 'none';
+        hamburgerMenuBtn.classList.remove('active');
+    });
+});
+
 feedbackBtn.addEventListener('click', () => {
     feedbackModal.style.display = 'flex';
     feedbackText.value = '';

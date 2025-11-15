@@ -1694,6 +1694,143 @@ def delete_all_data():
         traceback.print_exc()
         return jsonify({'error': f'Error deleting data: {str(e)}'}), 500
 
+@app.route('/api/delete-sample-workouts', methods=['POST'])
+@require_auth
+def delete_sample_workouts():
+    """Delete all sample workouts for the current user"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'error': 'Authentication required'}), 401
+    
+    try:
+        user_id = int(user_id)
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid user ID'}), 400
+    
+    if not USE_DATABASE:
+        return jsonify({'error': 'Database not available'}), 500
+    
+    try:
+        db_url = get_db_url()
+        use_sqlite = is_sqlite(db_url)
+        
+        # Get all workouts for the user
+        workouts = get_workouts_from_db(user_id) or []
+        
+        # Find sample workouts (those with [SAMPLE] tag)
+        sample_workouts = []
+        for workout in workouts:
+            text = workout.get('text', '')
+            if '[SAMPLE]' in text:
+                sample_workouts.append({
+                    'date': workout.get('date', ''),
+                    'text': text
+                })
+        
+        if not sample_workouts:
+            return jsonify({
+                'success': True,
+                'deleted': 0,
+                'message': 'No sample workouts found'
+            })
+        
+        # Delete sample workouts from database
+        deleted_count = 0
+        with get_db_connection() as conn:
+            cur = get_cursor(conn)
+            for workout in sample_workouts:
+                if use_sqlite:
+                    cur.execute("""
+                        DELETE FROM workouts 
+                        WHERE user_id = ? AND date = ? AND text = ?
+                    """, (user_id, workout['date'], workout['text']))
+                else:
+                    cur.execute("""
+                        DELETE FROM workouts 
+                        WHERE user_id = %s AND date = %s AND text = %s
+                    """, (user_id, workout['date'], workout['text']))
+                
+                if cur.rowcount > 0:
+                    deleted_count += 1
+        
+        return jsonify({
+            'success': True,
+            'deleted': deleted_count,
+            'message': f'Deleted {deleted_count} sample workouts'
+        })
+        
+    except Exception as e:
+        print(f"Error deleting sample workouts: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Error deleting sample workouts: {str(e)}'}), 500
+
+@app.route('/api/create-sample-workouts', methods=['POST'])
+@require_auth
+def create_sample_workouts():
+    """Create sample workouts for new users"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'error': 'Authentication required'}), 401
+    
+    # Check if user already has workouts
+    existing_workouts = get_workouts_from_db(user_id)
+    if existing_workouts and len(existing_workouts) > 0:
+        return jsonify({
+            'success': True,
+            'message': 'User already has workouts',
+            'created': 0
+        })
+    
+    # Create 3 sample workouts (8-10 days ago to trigger neglect feature - 7+ days)
+    from datetime import datetime, timedelta
+    now = datetime.now()
+    
+    sample_workouts = [
+        {
+            'date': (now - timedelta(days=10)).strftime('%m/%d/%y'),
+            'text': """[SAMPLE] Upper body workout
+
+bench press - 135 * 10, 8, 6
+dumbbell row - 50 * 12, 10, 8
+shoulder press - 95 * 10, 8, 6
+tricep extension - 30 * 12, 10
+bicep curl - 25 * 12, 10"""
+        },
+        {
+            'date': (now - timedelta(days=9)).strftime('%m/%d/%y'),
+            'text': """[SAMPLE] Lower body workout
+
+squat - 185 * 10, 8, 6
+leg press - 225 * 12, 10, 8
+leg curl - 100 * 12, 10
+calf raise - 90 * 15, 12, 10
+ab crunch - 20 * 15, 12"""
+        },
+        {
+            'date': (now - timedelta(days=8)).strftime('%m/%d/%y'),
+            'text': """[SAMPLE] Upper body variation
+
+incline dumbbell press - 60 * 10, 8, 6
+pull-up - 0 * 10, 8, 6
+lateral raise - 20 * 12, 10, 8
+dumbbell curl - 25 * 12, 10
+overhead tricep extension - 25 * 12, 10"""
+        }
+    ]
+    
+    created_count = 0
+    for workout in sample_workouts:
+        workout_id = add_workout_to_db(workout['date'], workout['text'], user_id)
+        if workout_id:
+            created_count += 1
+    
+    return jsonify({
+        'success': True,
+        'created': created_count,
+        'message': f'Created {created_count} sample workouts'
+    })
+
 @app.route('/api/workouts', methods=['GET'])
 def get_workouts():
     """Get all workout entries from database or file"""

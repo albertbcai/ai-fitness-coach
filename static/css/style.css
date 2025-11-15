@@ -60,6 +60,101 @@ body::-webkit-scrollbar {
     align-items: center;
     margin-bottom: 20px;
     padding: 0 4px;
+    position: relative;
+}
+
+.header-menu-wrapper {
+    position: relative;
+}
+
+/* Hamburger Menu Button */
+.hamburger-menu-btn {
+    background: transparent;
+    border: 1px solid #30363d;
+    color: #8b949e;
+    cursor: pointer;
+    font-size: 20px;
+    padding: 0;
+    border-radius: 6px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    font-family: inherit;
+}
+
+.hamburger-menu-btn:hover {
+    background: #21262d;
+    border-color: #58a6ff;
+    color: #e6edf3;
+}
+
+.hamburger-menu-btn:active {
+    transform: scale(0.95);
+}
+
+.hamburger-menu-btn.active {
+    background: #21262d;
+    border-color: #58a6ff;
+    color: #e6edf3;
+}
+
+/* Hamburger Menu Dropdown */
+.hamburger-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    min-width: 180px;
+    z-index: 1000;
+    padding: 8px 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.menu-item {
+    background: transparent;
+    border: none;
+    color: #8b949e;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 10px 16px;
+    text-align: left;
+    transition: all 0.2s;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.menu-item:hover {
+    background: #21262d;
+    color: #e6edf3;
+}
+
+.menu-item:active {
+    background: #161b22;
+}
+
+.menu-item-danger {
+    color: #f85149;
+}
+
+.menu-item-danger:hover {
+    background: #21262d;
+    color: #ff6b6b;
+}
+
+.menu-divider {
+    height: 1px;
+    background: #30363d;
+    margin: 4px 0;
 }
 
 .header-text-btn {

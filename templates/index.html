@@ -49,13 +49,21 @@
     <div class="container" id="main-container" style="display: none;">
         <div class="header-row">
             <span id="user-info" style="font-size: 14px; color: #8b949e;"></span>
-            <div style="display: flex; gap: 10px; align-items: center;">
-                <input type="file" id="import-workouts-input" accept=".md" style="display: none;">
-                <button class="header-text-btn" id="import-workouts-btn">Import</button>
-                <button class="header-text-btn" id="export-workouts-btn">Export</button>
-                <button class="header-text-btn" id="delete-all-data-btn" style="color: #d1242f;">Delete All</button>
-                <button class="header-text-btn" id="logout-btn">Log out</button>
-                <button class="header-text-btn" id="feedback-btn">Feedback</button>
+            <div class="header-menu-wrapper">
+                <!-- Hamburger Menu Button -->
+                <button class="hamburger-menu-btn" id="hamburger-menu-btn" aria-label="Menu">☰</button>
+                
+                <!-- Menu Dropdown -->
+                <div class="hamburger-menu" id="hamburger-menu" style="display: none;">
+                    <input type="file" id="import-workouts-input" accept=".md" style="display: none;">
+                    <button class="menu-item" id="import-workouts-btn">📥 Import</button>
+                    <button class="menu-item" id="export-workouts-btn">📤 Export</button>
+                    <button class="menu-item menu-item-danger" id="delete-sample-workouts-btn" style="display: none;">🗑️ Delete Sample Workouts</button>
+                    <button class="menu-item menu-item-danger" id="delete-all-data-btn">🗑️ Delete All</button>
+                    <div class="menu-divider"></div>
+                    <button class="menu-item" id="feedback-btn">💬 Feedback</button>
+                    <button class="menu-item" id="logout-btn">🚪 Log out</button>
+                </div>
             </div>
         </div>
         <main class="notes-view">
@@ -79,7 +87,12 @@
                 <textarea 
                     id="new-workout-input" 
                     class="new-entry-input"
-                    placeholder="Add your workout or click 'Copy' on a previous workout..."
+                    placeholder="Enter workout (format: exercise - weight * reps, reps, reps...)
+
+Example:
+bench press - 135 * 10, 8, 6
+dumbbell curl - 25 * 12, 10, 8
+squat - 185 * 8, 6, 5"
                 ></textarea>
                 
                 <!-- Progressive Overload Suggestions -->
