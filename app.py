@@ -5019,15 +5019,92 @@ def submit_suggestion_feedback():
 
 @app.route('/api/view-feedback', methods=['GET'])
 def view_feedback():
-    """View all feedback (for debugging)"""
-    if not FEEDBACK_LOG.exists():
-        return jsonify({'feedbacks': []})
+    """View all feedback from database or file (for debugging/admin)"""
+    feedbacks = []
     
-    try:
-        feedbacks = json.loads(FEEDBACK_LOG.read_text())
-        return jsonify({'feedbacks': feedbacks, 'count': len(feedbacks)})
-    except:
-        return jsonify({'feedbacks': [], 'count': 0})
+    # Try database first
+    if USE_DATABASE:
+        try:
+            db_url = get_db_url()
+            use_sqlite = is_sqlite(db_url)
+            with get_db_connection() as conn:
+                cur = get_cursor(conn)
+                # Fetch feedback with username join
+                if use_sqlite:
+                    cur.execute("""
+                        SELECT f.id, f.text, f.timestamp, f.user_agent, f.metadata, f.user_id, f.created_at, u.username
+                        FROM feedback f
+                        LEFT JOIN users u ON f.user_id = u.id
+                        ORDER BY f.timestamp DESC
+                    """)
+                else:
+                    cur.execute("""
+                        SELECT f.id, f.text, f.timestamp, f.user_agent, f.metadata, f.user_id, f.created_at, u.username
+                        FROM feedback f
+                        LEFT JOIN users u ON f.user_id = u.id
+                        ORDER BY f.timestamp DESC
+                    """)
+                
+                rows = cur.fetchall()
+                for row in rows:
+                    feedback_entry = {
+                        'id': row[0],
+                        'text': row[1],
+                        'timestamp': row[2].isoformat() if hasattr(row[2], 'isoformat') else str(row[2]),
+                        'user_agent': row[3] or '',
+                        'user_id': row[5] if row[5] is not None else None,
+                        'username': row[7] if len(row) > 7 and row[7] else None,
+                        'created_at': row[6].isoformat() if len(row) > 6 and row[6] and hasattr(row[6], 'isoformat') else None
+                    }
+                    
+                    # Parse metadata if it's a JSON string
+                    metadata = row[4] if len(row) > 4 else None
+                    if metadata:
+                        try:
+                            if isinstance(metadata, str):
+                                feedback_entry['metadata'] = json.loads(metadata)
+                            else:
+                                feedback_entry['metadata'] = metadata
+                        except:
+                            feedback_entry['metadata'] = metadata
+                    else:
+                        feedback_entry['metadata'] = {}
+                    
+                    feedbacks.append(feedback_entry)
+            
+            return jsonify({
+                'feedbacks': feedbacks,
+                'count': len(feedbacks),
+                'source': 'database'
+            })
+        except Exception as e:
+            print(f"Error loading feedback from database: {e}")
+            import traceback
+            traceback.print_exc()
+            # Fall through to file-based
+    
+    # File-based fallback
+    if FEEDBACK_LOG.exists():
+        try:
+            feedbacks = json.loads(FEEDBACK_LOG.read_text())
+            return jsonify({
+                'feedbacks': feedbacks,
+                'count': len(feedbacks),
+                'source': 'file'
+            })
+        except:
+            pass
+    
+    return jsonify({
+        'feedbacks': [],
+        'count': 0,
+        'source': 'none'
+    })
+
+@app.route('/admin/feedback', methods=['GET'])
+def admin_feedback_page():
+    """Admin page to view feedback in a readable format"""
+    return render_template('admin_feedback.html')
 
 if __name__ == '__main__':
     print("\n" + "="*50)

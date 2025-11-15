@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feedback Admin - AI Fitness Coach</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .header-info {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .refresh-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        
+        .refresh-btn:hover {
+            background: #45a049;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        
+        .feedback-item {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            background: #fafafa;
+        }
+        
+        .feedback-item.new-format {
+            background: white;
+            border-left: 4px solid #2196F3;
+        }
+        
+        .feedback-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .feedback-id {
+            color: #999;
+            font-size: 12px;
+            font-family: monospace;
+        }
+        
+        .feedback-timestamp {
+            color: #666;
+            font-size: 13px;
+        }
+        
+        .feedback-user {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+        }
+        
+        .feedback-user.anonymous {
+            background: #f5f5f5;
+            color: #757575;
+        }
+        
+        .feedback-text {
+            font-size: 15px;
+            color: #333;
+            margin-bottom: 15px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .feedback-suggestion {
+            background: #fff3e0;
+            border-left: 3px solid #ff9800;
+            padding: 12px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        
+        .feedback-suggestion-title {
+            font-weight: 600;
+            color: #e65100;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+        
+        .feedback-suggestion-content {
+            font-size: 14px;
+            color: #666;
+            white-space: pre-wrap;
+        }
+        
+        .metadata-section {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .metadata-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #999;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .metadata-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            font-size: 13px;
+        }
+        
+        .metadata-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .metadata-label {
+            color: #666;
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+        
+        .metadata-value {
+            color: #333;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .user-agent {
+            font-size: 11px;
+            color: #999;
+            font-style: italic;
+            margin-top: 10px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📝 Feedback Admin</h1>
+        <div class="header-info">
+            <span id="source-info">Loading...</span> | 
+            <span id="count-info">0 feedback entries</span>
+        </div>
+        
+        <button class="refresh-btn" onclick="loadFeedback()">🔄 Refresh</button>
+        
+        <div id="error-container"></div>
+        <div id="loading" class="loading">Loading feedback...</div>
+        <div id="feedback-container"></div>
+    </div>
+    
+    <script>
+        function formatTimestamp(timestamp) {
+            if (!timestamp) return 'Unknown';
+            try {
+                const date = new Date(timestamp);
+                return date.toLocaleString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    timeZoneName: 'short'
+                });
+            } catch (e) {
+                return timestamp;
+            }
+        }
+        
+        function formatMetadata(metadata) {
+            if (!metadata || typeof metadata !== 'object') return '';
+            
+            const items = [];
+            if (metadata.workout_count !== undefined) {
+                items.push({ label: 'Workouts', value: metadata.workout_count });
+            }
+            if (metadata.device_type) {
+                items.push({ label: 'Device', value: metadata.device_type });
+            }
+            if (metadata.screen_width && metadata.screen_height) {
+                items.push({ label: 'Screen', value: `${metadata.screen_width}×${metadata.screen_height}` });
+            }
+            if (metadata.last_workout_date) {
+                items.push({ label: 'Last Workout', value: metadata.last_workout_date });
+            }
+            if (metadata.recovery_check_visible !== undefined) {
+                items.push({ label: 'Recovery Check', value: metadata.recovery_check_visible ? 'Visible' : 'Hidden' });
+            }
+            if (metadata.analytics_open !== undefined) {
+                items.push({ label: 'Analytics', value: metadata.analytics_open ? 'Open' : 'Closed' });
+            }
+            if (metadata.search_active !== undefined) {
+                items.push({ label: 'Search', value: metadata.search_active ? 'Active' : 'Inactive' });
+            }
+            if (metadata.search_query) {
+                items.push({ label: 'Search Query', value: metadata.search_query });
+            }
+            if (metadata.url) {
+                items.push({ label: 'URL', value: metadata.url });
+            }
+            
+            return items;
+        }
+        
+        function renderFeedback(feedbacks) {
+            const container = document.getElementById('feedback-container');
+            const loading = document.getElementById('loading');
+            const countInfo = document.getElementById('count-info');
+            
+            loading.style.display = 'none';
+            countInfo.textContent = `${feedbacks.length} feedback ${feedbacks.length === 1 ? 'entry' : 'entries'}`;
+            
+            if (feedbacks.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📭</div>
+                        <div>No feedback entries found</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = feedbacks.map((feedback, index) => {
+                // Determine format: new format has 'text', old format has 'feedback' and 'suggestion'
+                const isNewFormat = feedback.text !== undefined;
+                const isOldFormat = feedback.feedback !== undefined;
+                const hasSuggestion = feedback.suggestion !== undefined;
+                const metadata = formatMetadata(feedback.metadata || {});
+                const hasUserInfo = feedback.user_id !== undefined && feedback.user_id !== null;
+                
+                return `
+                    <div class="feedback-item ${isNewFormat ? 'new-format' : ''}">
+                        <div class="feedback-header">
+                            <div>
+                                ${hasUserInfo ? `
+                                    <span class="feedback-user">User #${feedback.user_id}${feedback.username ? ` (${feedback.username})` : ''}</span>
+                                ` : `
+                                    <span class="feedback-user anonymous">Anonymous</span>
+                                `}
+                                ${feedback.id ? `<span class="feedback-id">ID: ${feedback.id}</span>` : `<span class="feedback-id">Entry #${index + 1}</span>`}
+                                ${isNewFormat ? '<span style="color: #2196F3; font-size: 11px; margin-left: 8px;">✓ New Format</span>' : '<span style="color: #999; font-size: 11px; margin-left: 8px;">Legacy Format</span>'}
+                            </div>
+                            <div class="feedback-timestamp">${formatTimestamp(feedback.timestamp)}</div>
+                        </div>
+                        
+                        ${hasSuggestion ? `
+                            <div class="feedback-suggestion">
+                                <div class="feedback-suggestion-title">Suggestion:</div>
+                                <div class="feedback-suggestion-content">${escapeHtml(feedback.suggestion)}</div>
+                            </div>
+                        ` : ''}
+                        
+                        <div class="feedback-text">
+                            ${escapeHtml(feedback.text || feedback.feedback || 'No text provided')}
+                        </div>
+                        
+                        ${metadata.length > 0 ? `
+                            <div class="metadata-section">
+                                <div class="metadata-title">App Context</div>
+                                <div class="metadata-grid">
+                                    ${metadata.map(item => `
+                                        <div class="metadata-item">
+                                            <div class="metadata-label">${item.label}</div>
+                                            <div class="metadata-value">${escapeHtml(String(item.value))}</div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        ${feedback.user_agent ? `
+                            <div class="user-agent">${escapeHtml(feedback.user_agent)}</div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        async function loadFeedback() {
+            const loading = document.getElementById('loading');
+            const errorContainer = document.getElementById('error-container');
+            const sourceInfo = document.getElementById('source-info');
+            
+            loading.style.display = 'block';
+            errorContainer.innerHTML = '';
+            
+            try {
+                const response = await fetch('/api/view-feedback');
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to load feedback');
+                }
+                
+                sourceInfo.textContent = `Source: ${data.source || (data.feedbacks && data.feedbacks.length > 0 && data.feedbacks[0].user_id !== undefined ? 'database' : 'file') || 'unknown'}`;
+                renderFeedback(data.feedbacks || []);
+            } catch (error) {
+                loading.style.display = 'none';
+                errorContainer.innerHTML = `
+                    <div class="error">
+                        <strong>Error loading feedback:</strong> ${escapeHtml(error.message)}
+                    </div>
+                `;
+            }
+        }
+        
+        // Load on page load
+        loadFeedback();
+        
+        // Auto-refresh every 30 seconds
+        setInterval(loadFeedback, 30000);
+    </script>
+</body>
+</html>
+
